@@ -10,7 +10,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: "/login",
     error: "/login", // ToastController reads error param
-    verifyRequest: "/login?status=magic_sent",
+    verifyRequest: "/login",
   },
   trustHost: true,
   providers: [
@@ -32,12 +32,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
-      if (!user?.email) return false
-      const allowed = await prisma.adminWhitelist.findUnique({
-        where: { email: user.email },
-      })
-      return true
+    async signIn({ user, account, profile, email, credentials }) {
+      if (!user?.email) {
+        return false
+      }
+
+      try {
+        const allowed = await prisma.adminWhitelist.findUnique({
+          where: { email: user.email },
+        })
+        if (!allowed) {
+          return false
+        }
+        return true
+      } catch (error) {
+        return false
+      }
     },
     async session({ session, user }) {
       if (session.user && user) {
@@ -50,24 +60,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       try {
         const target = new URL(url, baseUrl)
         const pathname = target.pathname
+
+        if (pathname.startsWith("/api/auth/callback")) {
+          const redirectUrl = `${baseUrl}/?status=signed_in`
+          return redirectUrl
+        }
         if (pathname.startsWith("/api/auth/verify-request")) {
-          return `${baseUrl}/login?status=magic_sent`
+          const redirectUrl = `${baseUrl}/login?status=magic_sent`
+          return redirectUrl
         }
         if (pathname.startsWith("/api/auth/error")) {
           const err = target.searchParams.get("error")
-          return err ? `${baseUrl}/login?error=${encodeURIComponent(err)}` : `${baseUrl}/login`
+          const redirectUrl = err ? `${baseUrl}/login?error=${encodeURIComponent(err)}` : `${baseUrl}/login`
+          return redirectUrl
         }
-        if (url.startsWith("/")) return `${baseUrl}${url}`
-        if (target.origin === baseUrl) return target.toString()
-      } catch (_) {}
+        if (url.startsWith("/")) {
+          const redirectUrl = `${baseUrl}${url}`
+          return redirectUrl
+        }
+        if (target.origin === baseUrl) {
+          return target.toString()
+        }
+      } catch (error) {
+      }
       return baseUrl
     },
   },
-  debug: process.env.NODE_ENV === "development",
-  logger: {
-    error(error) {
-      console.error("NextAuth Error:", error)
-      console.log(error.cause)
-    },
-  },
+  debug: true,
 })
