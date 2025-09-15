@@ -1,14 +1,21 @@
-import { auth as middleware} from "@/auth"
 import { NextResponse } from "next/server"
+import { auth } from "@/auth-edge"
 
-export default middleware((req) => {
-  if (!req.auth) {
-    const url = req.url.replace(req.nextUrl.pathname, "/login")
-    return NextResponse.redirect(url)
+export default auth((req) => {
+  const pathname = req.nextUrl.pathname
+  const isAuthed = !!req.auth
+
+  if (!isAuthed && pathname !== "/login") {
+    return NextResponse.redirect(new URL("/login", req.url))
   }
+
+  if (isAuthed && pathname === "/login") {
+    return NextResponse.redirect(new URL("/", req.url))
+  }
+
   return NextResponse.next()
 })
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|login).*)"],
+  matcher: ["/", "/((?!api|_next/static|_next/image|favicon.ico|login).*)"],
 }

@@ -11,12 +11,12 @@ export function PrismaAdapter(
 ): Adapter {
   const p = prisma as PrismaClient
   return {
-    createUser: ({ id, ...data }) => p.admins.create(stripUndefined(data)),
+    createUser: ({ id: _id, ...data }) => p.admins.create(stripUndefined(data)),
     getUser: (id) => p.admins.findUnique({ where: { id } }),
     getUserByEmail: (email) => p.admins.findUnique({ where: { email } }),
-    async getUserByAccount(provider_providerAccountId) {
-      const account = await p.adminAccount.findUnique({
-        where: { provider_providerAccountId },
+    async getUserByAccount({ provider, providerAccountId }) {
+      const account = await p.adminAccount.findFirst({
+        where: { provider, providerAccountId },
         include: { admin: true },
       })
       return (account?.admin as AdapterUser) ?? null
@@ -30,10 +30,10 @@ export function PrismaAdapter(
       p.admins.delete({ where: { id } }) as Promise<AdapterUser>,
     linkAccount: (data) =>
       p.adminAccount.create({ data }) as unknown as AdapterAccount,
-    unlinkAccount: (provider_providerAccountId) =>
-      p.adminAccount.delete({
-        where: { provider_providerAccountId },
-      }) as unknown as AdapterAccount,
+    unlinkAccount: async ({ provider, providerAccountId }) => {
+      await p.adminAccount.deleteMany({ where: { provider, providerAccountId } })
+      return { provider, providerAccountId } as unknown as AdapterAccount
+    },
     async getSessionAndUser(sessionToken) {
       const userAndSession = await p.adminSession.findUnique({
         where: { sessionToken },
