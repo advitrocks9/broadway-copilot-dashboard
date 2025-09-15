@@ -1,4 +1,4 @@
-import { signIn, signOut } from "@/auth"
+import { signIn, signOut } from "@/lib/auth"
 import { LoginForm } from "@/components/login-form"
 
 export default function LoginPage() {

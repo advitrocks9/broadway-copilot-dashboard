@@ -3,13 +3,11 @@
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { MessageThreadClient } from "@/components/users/MessageThreadClient"
+import { UsersTable } from "@/components/users/UsersTable"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
@@ -87,12 +85,12 @@ async function removeFromWhitelist(waId: string) {
 export default async function UsersPage() {
   const rows = await listWhitelistedUsers()
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Users (whitelisted only)</h1>
+    <div className="flex flex-col gap-4 ">
+      <div className="flex items-center justify-between px-4 py-[22px] lg:px-6 lg:py-[24px]">
+        <h1 className="text-4xl font-semibold">Users</h1>
         <Dialog>
           <DialogTrigger asChild>
-            <Button>Add to whitelist</Button>
+            <Button size="sm">Add to whitelist</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -111,50 +109,19 @@ export default async function UsersPage() {
         </Dialog>
       </div>
 
-      <Card>
+      <Card className="mx-4 lg:mx-6">
         <CardHeader>
           <CardTitle>Whitelisted Users</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Identifier</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Last active</TableHead>
-                <TableHead>Total messages</TableHead>
-                <TableHead>Total cost</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell>{r.waId}</TableCell>
-                  <TableCell>{new Date(r.createdAt).toLocaleString()}</TableCell>
-                  <TableCell>{r.lastActive ? new Date(r.lastActive).toLocaleString() : "-"}</TableCell>
-                  <TableCell>{r.messages}</TableCell>
-                  <TableCell>${r.cost.toFixed(4)}</TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <form action={async () => { "use server"; await removeFromWhitelist(r.waId) }} className="inline">
-                      <Button type="submit" variant="outline">Remove</Button>
-                    </form>
-                    <Sheet>
-                      <SheetTrigger asChild>
-                        <Button variant="ghost">View details</Button>
-                      </SheetTrigger>
-                      <SheetContent className="w-[560px] sm:max-w-[640px] overflow-y-auto">
-                        <SheetHeader>
-                          <SheetTitle>Conversation with {r.waId}</SheetTitle>
-                        </SheetHeader>
-                        <MessageThreadClient userId={r.id} />
-                      </SheetContent>
-                    </Sheet>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <UsersTable rows={rows.map(r => ({
+            id: r.id,
+            waId: r.waId,
+            createdAt: r.createdAt.toISOString(),
+            lastActive: r.lastActive ? r.lastActive.toISOString() : null,
+            messages: r.messages,
+            cost: r.cost,
+          }))} />
         </CardContent>
       </Card>
     </div>
