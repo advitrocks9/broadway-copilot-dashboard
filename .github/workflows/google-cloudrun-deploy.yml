@@ -38,12 +38,12 @@ jobs:
         uses: 'google-github-actions/get-secretmanager-secrets@v2'
         with:
           secrets: |-
-            db_url:ACCELERATE_DATABASE_URL:latest
-          project_id: ${{ env.PROJECT_ID }}
+            DATABASE_URL:${{ env.PROJECT_ID }}/ACCELERATE_DATABASE_URL
+            
       - name: 'Build and Push Container'
         run: |
           DOCKER_TAG="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/broadway-chatbot/${{ env.SERVICE }}:${{ github.sha }}"
-          docker build --build-arg DATABASE_URL=${{ steps.get-db-url.outputs.db_url }} --tag "${DOCKER_TAG}" .
+          docker build --build-arg DATABASE_URL=${{ steps.get-db-url.outputs.DATABASE_URL }} --tag "${DOCKER_TAG}" .
           docker push "${DOCKER_TAG}"
 
       - id: deploy
@@ -71,7 +71,6 @@ jobs:
             --memory=4Gi
             --min-instances=1
             --no-invoker-iam-check
-            --concurrency=8
 
       - name: 'Show output'
         run: |
