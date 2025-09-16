@@ -55,7 +55,7 @@ jobs:
             GMAIL_USER=GMAIL_USER:latest
             GMAIL_PASS=GMAIL_PASS:latest
             AUTH_SECRET=AUTH_SECRET:latest
-            DATABASE_URL=_ACCELERAT_DATABASEE_URL:latest
+            DATABASE_URL=ACCELERATE_DATABASE_URL:latest
           flags: >-
             --execution-environment=gen2
             --service-account=github-actions-deploy@broadway-chatbot.iam.gserviceaccount.com
