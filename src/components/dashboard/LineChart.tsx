@@ -111,8 +111,8 @@ export function UsersLineChart({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Active Users (Last 7 days)</CardTitle>
-        <CardDescription>Daily unique users</CardDescription>
+        <CardTitle>Active Users</CardTitle>
+        <CardDescription>Last 7 days, 12-hour unique users</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig}>

@@ -110,7 +110,7 @@ export function ModelCostPieChart({
   return (
     <Card className="flex flex-col">
       <CardHeader className="pb-0">
-        <CardTitle>Model cost split (Last 7 days)</CardTitle>
+        <CardTitle>Model cost split (last 7 days)</CardTitle>
         <CardDescription>Top models by spend</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">

@@ -1,6 +1,6 @@
 "use client"
 
-import { IconCirclePlusFilled, IconMail, type Icon } from "@tabler/icons-react"
+import { IconCirclePlusFilled, IconMessageCircle, type Icon } from "@tabler/icons-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -9,6 +9,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
 
 export function NavMain({
@@ -26,19 +27,25 @@ export function NavMain({
         <SidebarMenu>
           <SidebarMenuItem className="flex items-center gap-2">
             <SidebarMenuButton
-              tooltip="Quick Create"
+              tooltip="Quick Chat"
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
+              asChild
             >
-              <IconCirclePlusFilled />
-              <span>Quick Create</span>
+              <a href="http://wa.me/+14155238886?text=join%20wave-swung" target="_blank" rel="noopener noreferrer">
+                <IconCirclePlusFilled />
+                <span>Quick Chat</span>
+              </a>
             </SidebarMenuButton>
             <Button
               size="icon"
               className="size-8 group-data-[collapsible=icon]:opacity-0"
               variant="outline"
+              asChild
             >
-              <IconMail />
-              <span className="sr-only">Inbox</span>
+              <a href="http://wa.me/+14155238886?text=join%20wave-swung" target="_blank" rel="noopener noreferrer">
+                <IconMessageCircle />
+                <span className="sr-only">Chat</span>
+              </a>
             </Button>
           </SidebarMenuItem>
         </SidebarMenu>

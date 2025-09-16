@@ -1,28 +1,32 @@
 import { prisma } from "@/lib/prisma"
-import { SectionCards } from "@/components/section-cards"
+import { SectionCards } from "@/components/dashboard/section-cards"
 import { MessagesErrorsBarChart } from "@/components/dashboard/BarChart"
 import { ModelCostPieChart } from "@/components/dashboard/PieChart"
 import { UsersLineChart } from "@/components/dashboard/LineChart"
 
 
-function getLastWeek(): { start: Date; end: Date; bucket: "day" } {
+function getLastWeek(): { start: Date; end: Date } {
   const now = new Date()
   const start = new Date(now.getTime() - 7 * 86400000)
-  return { start, end: now, bucket: "day" }
+  return { start, end: now }
 }
 
-function formatBucketLabel(d: Date, bucket: "hour" | "day") {
-  return bucket === "hour"
-    ? `${d.getHours().toString().padStart(2, "0")}:00`
-    : `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`
+function formatBucketLabel(d: Date, includeTime: boolean) {
+  const yyyy = d.getFullYear()
+  const mm = (d.getMonth() + 1).toString().padStart(2, "0")
+  const dd = d.getDate().toString().padStart(2, "0")
+  if (!includeTime) return `${yyyy}-${mm}-${dd}`
+  const hh = d.getHours().toString().padStart(2, "0")
+  const min = d.getMinutes().toString().padStart(2, "0")
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
 }
 
-function enumerateBuckets(start: Date, end: Date, bucket: "hour" | "day") {
-  const stepMs = bucket === "hour" ? 3600000 : 86400000
+function enumerateBuckets(start: Date, end: Date, stepMs: number) {
   const points: { key: string; date: Date }[] = []
-  const cursor = new Date(start.getTime() - (start.getTime() % stepMs))
+  const alignedStart = new Date(Math.floor(start.getTime() / stepMs) * stepMs)
+  const cursor = new Date(alignedStart)
   while (cursor <= end) {
-    points.push({ key: formatBucketLabel(cursor, bucket), date: new Date(cursor) })
+    points.push({ key: formatBucketLabel(cursor, true), date: new Date(cursor) })
     cursor.setTime(cursor.getTime() + stepMs)
   }
   return points
@@ -63,21 +67,23 @@ async function getTopMetrics(start: Date) {
 }
 
 /**
- * Returns time-series for messages and error runs, zero-filled.
+ * Returns time-series for messages and error runs, zero-filled, using a custom bucket in hours.
  */
-async function getTimeSeries(start: Date, end: Date, bucket: "hour" | "day") {
-  const trunc = bucket === "hour" ? "hour" : "day"
+async function getTimeSeries(start: Date, end: Date, bucketHours: number) {
+  const bucketSeconds = bucketHours * 3600
 
   const [msgRows, errRows] = await Promise.all([
     prisma.$queryRaw<{ ts: Date; value: number }[]>`
-      SELECT date_trunc(${trunc}, m."createdAt") AS ts, COUNT(*)::int AS value
+      SELECT to_timestamp(floor(extract(epoch from m."createdAt")/${bucketSeconds})*${bucketSeconds}) AS ts,
+             COUNT(*)::int AS value
       FROM "Message" m
       WHERE m."createdAt" >= ${start} AND m."createdAt" <= ${end}
       GROUP BY 1
       ORDER BY 1
     `,
     prisma.$queryRaw<{ ts: Date; value: number }[]>`
-      SELECT date_trunc(${trunc}, gr."startTime") AS ts, COUNT(*)::int AS value
+      SELECT to_timestamp(floor(extract(epoch from gr."startTime")/${bucketSeconds})*${bucketSeconds}) AS ts,
+             COUNT(*)::int AS value
       FROM "GraphRun" gr
       WHERE gr."startTime" >= ${start} AND gr."startTime" <= ${end} AND gr.status = 'ERROR'
       GROUP BY 1
@@ -85,9 +91,10 @@ async function getTimeSeries(start: Date, end: Date, bucket: "hour" | "day") {
     `,
   ])
 
-  const buckets = enumerateBuckets(start, end, bucket)
-  const msgMap = new Map(msgRows.map(r => [formatBucketLabel(r.ts, bucket), r.value]))
-  const errMap = new Map(errRows.map(r => [formatBucketLabel(r.ts, bucket), r.value]))
+  const stepMs = bucketSeconds * 1000
+  const buckets = enumerateBuckets(start, end, stepMs)
+  const msgMap = new Map(msgRows.map(r => [formatBucketLabel(r.ts, true), r.value]))
+  const errMap = new Map(errRows.map(r => [formatBucketLabel(r.ts, true), r.value]))
 
   const messages = buckets.map(b => ({ time: b.key, value: msgMap.get(b.key) ?? 0 }))
   const errors = buckets.map(b => ({ time: b.key, value: errMap.get(b.key) ?? 0 }))
@@ -95,19 +102,21 @@ async function getTimeSeries(start: Date, end: Date, bucket: "hour" | "day") {
 }
 
 /**
- * Returns unique active users per bucket, zero-filled.
+ * Returns unique active users per bucket, zero-filled, using a custom bucket in hours.
  */
-async function getUsersSeries(start: Date, end: Date, bucket: "hour" | "day") {
-  const trunc = bucket === "hour" ? "hour" : "day"
+async function getUsersSeries(start: Date, end: Date, bucketHours: number) {
+  const bucketSeconds = bucketHours * 3600
 
   const rows = await prisma.$queryRaw<{ ts: Date; value: number }[]>`
     WITH union_events AS (
-      SELECT date_trunc(${trunc}, m."createdAt") AS ts, c."userId" AS user_id
+      SELECT to_timestamp(floor(extract(epoch from m."createdAt")/${bucketSeconds})*${bucketSeconds}) AS ts,
+             c."userId" AS user_id
       FROM "Message" m
       JOIN "Conversation" c ON c.id = m."conversationId"
       WHERE m."createdAt" >= ${start} AND m."createdAt" <= ${end}
       UNION ALL
-      SELECT date_trunc(${trunc}, gr."startTime") AS ts, gr."userId" AS user_id
+      SELECT to_timestamp(floor(extract(epoch from gr."startTime")/${bucketSeconds})*${bucketSeconds}) AS ts,
+             gr."userId" AS user_id
       FROM "GraphRun" gr
       WHERE gr."startTime" >= ${start} AND gr."startTime" <= ${end}
     )
@@ -117,8 +126,9 @@ async function getUsersSeries(start: Date, end: Date, bucket: "hour" | "day") {
     ORDER BY ts
   `
 
-  const buckets = enumerateBuckets(start, end, bucket)
-  const valueMap = new Map(rows.map(r => [formatBucketLabel(r.ts, bucket), r.value]))
+  const stepMs = bucketSeconds * 1000
+  const buckets = enumerateBuckets(start, end, stepMs)
+  const valueMap = new Map(rows.map(r => [formatBucketLabel(r.ts, true), r.value]))
   const users = buckets.map(b => ({ time: b.key, value: valueMap.get(b.key) ?? 0 }))
   return users
 }
@@ -139,13 +149,13 @@ async function getCostByModel(start: Date) {
 }
 
 export default async function HomePage() {
-  const { start, end, bucket } = getLastWeek()
+  const { start, end } = getLastWeek()
 
   const [top, series, byModel, users] = await Promise.all([
     getTopMetrics(start),
-    getTimeSeries(start, end, bucket),
+    getTimeSeries(start, end, 3),
     getCostByModel(start),
-    getUsersSeries(start, end, bucket),
+    getUsersSeries(start, end, 12),
   ])
 
   const barData = series.messages.map((m, idx) => ({

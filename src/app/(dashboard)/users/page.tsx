@@ -2,20 +2,16 @@
 
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { UsersTable } from "@/components/users/UsersTable"
+import { DataTable } from "@/components/users/user-table"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { formatDistanceToNow } from "date-fns"
 
 async function listWhitelistedUsers() {
   const whitelist = await prisma.userWhitelist.findMany()
   const users = await prisma.user.findMany({
     where: { whatsappId: { in: whitelist.map(w => w.waId) } },
-    select: { id: true, whatsappId: true, createdAt: true },
+    select: { id: true, whatsappId: true, createdAt: true, profileName: true },
   })
 
   const lastActive = await prisma.$queryRaw<{ userId: string; ts: Date }[]>`
@@ -24,8 +20,11 @@ async function listWhitelistedUsers() {
     GROUP BY gr."userId"
   `
   const userIds = users.map(u => u.id)
-  const totals = userIds.length === 0 ? [] : await prisma.$queryRaw<{ userId: string; messages: number; cost: number }[]>`
-    SELECT c."userId", COUNT(m.*)::int as messages, COALESCE(SUM(lt."costUsd"),0)::float as cost
+  const totals = userIds.length === 0 ? [] : await prisma.$queryRaw<{ userId: string; messages: number; tokens: number; cost: number }[]>`
+    SELECT c."userId",
+      COUNT(m.*)::int as messages,
+      COALESCE(SUM(lt."totalTokens"),0)::int as tokens,
+      COALESCE(SUM(lt."costUsd"),0)::float as cost
     FROM "Conversation" c
     LEFT JOIN "Message" m ON m."conversationId" = c.id
     LEFT JOIN "GraphRun" gr ON gr."conversationId" = c.id
@@ -35,16 +34,33 @@ async function listWhitelistedUsers() {
   `
 
   const lastMap = new Map(lastActive.map(r => [r.userId, r.ts]))
-  const totalMap = new Map(totals.map(r => [r.userId, { messages: r.messages, cost: r.cost }]))
+  const totalMap = new Map(totals.map(r => [r.userId, { messages: r.messages, tokens: r.tokens, cost: r.cost }]))
 
-  return users.map(u => ({
+  const userRows = users.map(u => ({
     id: u.id,
     waId: u.whatsappId,
     createdAt: u.createdAt,
+    profileName: u.profileName,
     lastActive: lastMap.get(u.id) ?? null,
     messages: totalMap.get(u.id)?.messages ?? 0,
+    tokens: totalMap.get(u.id)?.tokens ?? 0,
     cost: totalMap.get(u.id)?.cost ?? 0,
   }))
+
+  const userWaIds = new Set(users.map(u => u.whatsappId))
+  const missing = whitelist
+    .filter(w => !userWaIds.has(w.waId))
+    .map(w => ({
+      id: `whitelist:${w.id}`,
+      waId: w.waId,
+      createdAt: null as unknown as Date,
+      lastActive: null as Date | null,
+      messages: 0,
+      tokens: 0,
+      cost: 0,
+    }))
+
+  return [...userRows, ...missing]
 }
 
 // Messages fetched on client via /api/users/messages
@@ -84,46 +100,22 @@ async function removeFromWhitelist(waId: string) {
 
 export default async function UsersPage() {
   const rows = await listWhitelistedUsers()
+  const tableData = rows.map((u, idx) => ({
+    id: idx + 1,
+    phoneNumber: u.waId,
+    name: ("profileName" in u && typeof (u as any).profileName === "string" ? (u as any).profileName : ""),
+    lastActive: u.lastActive ? `${formatDistanceToNow(new Date(u.lastActive))} ago` : "—",
+    totalMessages: String(u.messages ?? 0),
+    totalTokens: String(u.tokens ?? 0),
+  }))
   return (
     <div className="flex flex-col gap-4 ">
       <div className="flex items-center justify-between px-4 py-[22px] lg:px-6 lg:py-[24px]">
         <h1 className="text-4xl font-semibold">Users</h1>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button size="sm">Add to whitelist</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add to whitelist</DialogTitle>
-            </DialogHeader>
-            <form action={addToWhitelist} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="waId">waId</Label>
-                <Input id="waId" name="waId" placeholder="+911234567890" required />
-              </div>
-              <DialogFooter>
-                <Button type="submit">Add</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        
       </div>
 
-      <Card className="mx-4 lg:mx-6">
-        <CardHeader>
-          <CardTitle>Whitelisted Users</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <UsersTable rows={rows.map(r => ({
-            id: r.id,
-            waId: r.waId,
-            createdAt: r.createdAt.toISOString(),
-            lastActive: r.lastActive ? r.lastActive.toISOString() : null,
-            messages: r.messages,
-            cost: r.cost,
-          }))} />
-        </CardContent>
-      </Card>
+      <DataTable data={tableData} />
     </div>
   )
 }

@@ -34,7 +34,7 @@ export function SectionCards({
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs md:grid-cols-2 lg:grid-cols-2 lg:px-6">
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Active users 7 days</CardDescription>
+          <CardDescription>Active users (last 7 days)</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {activeUsers}
           </CardTitle>
@@ -45,7 +45,7 @@ export function SectionCards({
       </Card>
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Total messages 7 days</CardDescription>
+          <CardDescription>Total messages (last 7 days)</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {messages}
           </CardTitle>
@@ -56,7 +56,7 @@ export function SectionCards({
       </Card>
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Total errors 7 days</CardDescription>
+          <CardDescription>Total errors (last 7 days)</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {errors}
           </CardTitle>
@@ -67,7 +67,7 @@ export function SectionCards({
       </Card>
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Total cost (USD) 7 days</CardDescription>
+          <CardDescription>Total cost (USD, last 7 days)</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             ${costUsd.toFixed(4)}
           </CardTitle>

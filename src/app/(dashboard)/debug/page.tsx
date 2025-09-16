@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DebugTable } from "@/components/debug/DebugTable"
-import { DebugFilters, Status } from "@/components/debug/DebugFilters"
+import { DataTable } from "@/components/debug/debug-table"
+import { formatDistanceToNow } from "date-fns"
 
 type LocalStatus = Status
 
@@ -35,38 +34,37 @@ export default async function DebugPage({ searchParams }: { searchParams: Promis
   const range = rangeParam ?? "24h"
   const runs = await listRuns({ user, status, range })
   const statusForFilters: Status | "ALL" = (status as Status | undefined) ?? "ALL"
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="px-4 py-[22px] lg:px-6 lg:py-[24px]">
-        <DebugFilters initial={{ user, status: statusForFilters, range }} />
-      </div>
 
-      <Card className="mx-4 lg:mx-6">
-        <CardHeader>
-          <CardTitle>Graph runs</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DebugTable rows={runs.map(r => ({
-            id: r.id,
-            startTime: r.startTime.toISOString(),
-            user: r.user.profileName || r.user.whatsappId,
-            status: r.status,
-            durationMs: r.durationMs ?? null,
-            tokens: r.llmTraces.reduce((sum, t) => sum + (t.totalTokens || 0), 0),
-            firstUserMsg: String((r.initialState && (r.initialState as { input?: { Body?: string } }).input?.Body) || ""),
-            traces: r.llmTraces.map(t => ({
-              id: t.id,
-              startTime: t.startTime?.toISOString() ?? null,
-              durationMs: t.durationMs ?? null,
-              model: t.model,
-              totalTokens: t.totalTokens ?? null,
-              inputMessages: t.inputMessages,
-              outputMessage: t.outputMessage,
-            })),
-            errorTrace: r.errorTrace ?? null,
-          }))} />
-        </CardContent>
-      </Card>
+  const tableData = runs.map(run => {
+    const totalTokens = run.llmTraces.reduce((acc, trace) => acc + (trace.totalTokens ?? 0), 0)
+    const timeTaken = run.endTime ? (run.endTime.getTime() - run.startTime.getTime()) / 1000 : 0
+
+    const initialState = run.initialState as any
+    const userMessage = initialState?.input?.Body || "N/A"
+
+    const lastTrace = run.llmTraces.at(-1)
+    const outputMessage = lastTrace?.outputMessage as any
+    const assistantReply = (outputMessage && typeof outputMessage.content === "string") ? outputMessage.content : "N/A"
+
+    return {
+      graphRunId: run.id,
+      userphoneNumber: run.user.whatsappId,
+      status: run.status,
+      totalTokens: totalTokens.toString(),
+      timeTaken: `${timeTaken.toFixed(1)}s`,
+      startedAt: `${formatDistanceToNow(run.startTime)} ago`,
+      userMessage,
+      assistantReply,
+    }
+  })
+
+  return (
+    <div className="flex flex-col gap-4 ">
+      <div className="flex items-center justify-between px-4 py-[22px] lg:px-6 lg:py-[24px]">
+        <h1 className="text-4xl font-semibold">Debug</h1>
+        
+      </div>
+      <DataTable data={tableData} />
     </div>
   )
 }
