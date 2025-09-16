@@ -38,7 +38,7 @@ export function LoginForm({ onGoogle, className }: LoginFormProps) {
       } else {
         dispatchToast("Failed to send magic link. Please try again.", "error")
       }
-    } catch (error) {
+    } catch {
       dispatchToast("An error occurred. Please try again.", "error")
     } finally {
       setLoading(false)
