@@ -17,8 +17,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 
-export const description = "Messages & errors bar chart"
-
 export function MessagesErrorsBarChart({
   data,
 }: {

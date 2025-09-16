@@ -2,6 +2,7 @@ import { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 
+/** Adds user to whitelist */
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) return new Response(null, { status: 401 })
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/** Removes user from whitelist */
 export async function DELETE(req: NextRequest) {
   const session = await auth()
   if (!session) return new Response(null, { status: 401 })

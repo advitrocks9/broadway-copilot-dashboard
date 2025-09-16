@@ -32,7 +32,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile, email, credentials }) {
+    /** Handles user sign-in by checking whitelist */
+    async signIn({ user }) {
       if (!user?.email) {
         return false
       }
@@ -41,14 +42,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const allowed = await prisma.adminWhitelist.findUnique({
           where: { email: user.email },
         })
-        if (!allowed) {
-          return false
+        if (allowed) {
+          return true
         }
-        return true
-      } catch (error) {
+        return false
+      } catch {
         return false
       }
     },
+    /** Adds user ID to session object */
     async session({ session, user }) {
       if (session.user && user) {
         ;(session.user as typeof session.user & { id: string }).id = user.id
@@ -56,6 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return session
     },
+    /** Handles authentication flow redirects */
     async redirect({ url, baseUrl }) {
       try {
         const target = new URL(url, baseUrl)
@@ -81,10 +84,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (target.origin === baseUrl) {
           return target.toString()
         }
-      } catch (error) {
+      } catch {
       }
       return baseUrl
     },
   },
-  debug: true,
 })

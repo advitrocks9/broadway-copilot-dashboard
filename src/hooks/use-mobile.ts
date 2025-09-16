@@ -2,6 +2,7 @@ import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
 
+/** Returns boolean indicating if screen width is mobile */
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
 

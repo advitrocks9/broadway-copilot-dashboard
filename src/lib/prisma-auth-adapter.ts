@@ -6,12 +6,13 @@ import type {
   AdapterUser,
 } from "@auth/core/adapters"
 
+/** Custom Prisma adapter for NextAuth.js */
 export function PrismaAdapter(
   prisma: PrismaClient | ReturnType<PrismaClient["$extends"]>
 ): Adapter {
   const p = prisma as PrismaClient
   return {
-    createUser: ({ id: _id, ...data }) => p.admins.create(stripUndefined(data)),
+    createUser: ({ ...data }) => p.admins.create(stripUndefined(data)),
     getUser: (id) => p.admins.findUnique({ where: { id } }),
     getUserByEmail: (email) => p.admins.findUnique({ where: { email } }),
     async getUserByAccount({ provider, providerAccountId }) {
@@ -106,6 +107,7 @@ export function PrismaAdapter(
   }
 }
 
+/** Removes undefined properties from object */
 function stripUndefined<T>(obj: T) {
   const data = {} as T
   for (const key in obj) if (obj[key] !== undefined) data[key] = obj[key]

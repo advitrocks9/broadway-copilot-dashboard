@@ -1,11 +1,8 @@
 "use client"
 
 import {
-  IconCreditCard,
   IconDotsVertical,
   IconLogout,
-  IconNotification,
-  IconUserCircle,
 } from "@tabler/icons-react"
 import { signOut } from "next-auth/react"
 
@@ -17,7 +14,6 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -30,6 +26,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
+/** Renders user navigation component */
 export function NavUser({
   user,
 }: {

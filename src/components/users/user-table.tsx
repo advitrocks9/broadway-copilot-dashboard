@@ -30,6 +30,7 @@ import {
   IconGripVertical,
   IconLayoutColumns,
   IconPlus,
+  IconRefresh,
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -78,12 +79,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import {
   Dialog,
   DialogClose,
   DialogContent,
@@ -94,6 +89,7 @@ import {
 } from "@/components/ui/dialog"
 import { PhoneInput } from "@/components/users/phone-number-input"
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 export const schema = z.object({
   id: z.number(),
@@ -105,6 +101,7 @@ export const schema = z.object({
 })
 
 // Create a separate component for the drag handle
+/** Renders drag handle for sortable items */
 function DragHandle({ id }: { id: number }) {
   const { attributes, listeners } = useSortable({
     id,
@@ -224,7 +221,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
                   toast.success("User removed")
                   location.reload()
                 } else {
-                  const j = await res.json().catch(() => ({} as any)) as { error?: string }
+                  const j = (await res.json().catch(() => ({}))) as { error?: string }
                   toast.error(j?.error || "Failed to remove")
                 }
               } catch {
@@ -240,6 +237,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
 ]
 
+/** Renders draggable table row */
 function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
@@ -265,6 +263,7 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
   )
 }
 
+/** Data table with sorting, filtering, pagination, and drag-and-drop */
 export function DataTable({
   data: initialData,
 }: {
@@ -272,6 +271,11 @@ export function DataTable({
 }) {
   const router = useRouter()
   const [data, setData] = React.useState(() => initialData)
+
+  useEffect(() => {
+    setData(initialData)
+  }, [initialData])
+
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
@@ -323,6 +327,7 @@ export function DataTable({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
 
+  /** Handles drag end for row reordering */
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (active && over && active.id !== over.id) {
@@ -334,6 +339,7 @@ export function DataTable({
     }
   }
 
+  /** Adds new user to whitelist */
   async function handleAddUser() {
     const value = (waValue || "").trim()
     const isValid = /^\+91\d{10}$/.test(value)
@@ -356,7 +362,7 @@ export function DataTable({
       } else if (res.status === 409) {
         toast.info("Already whitelisted")
       } else {
-        const j = await res.json().catch(() => ({} as any)) as { error?: string }
+        const j = (await res.json().catch(() => ({}))) as { error?: string }
         toast.error(j?.error || "Failed to add")
       }
     } finally {
@@ -365,26 +371,17 @@ export function DataTable({
   }
 
   return (
-    <Tabs
-      defaultValue="outline"
-      className="w-full flex-col justify-start gap-6"
-    >
+    <div className="w-full flex-col justify-start gap-6">
       <div className="flex items-center justify-between px-4 lg:px-6">
         <Label htmlFor="view-selector" className="sr-only">
           View
         </Label>
 
-        <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="outline">Outline</TabsTrigger>
-          <TabsTrigger value="past-performance">
-            Past Performance <Badge variant="secondary">3</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="key-personnel">
-            Key Personnel <Badge variant="secondary">2</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
-        </TabsList>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.refresh()}>
+            <IconRefresh className="size-4" />
+            <span className="sr-only">Refresh</span>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
@@ -422,7 +419,7 @@ export function DataTable({
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
                 <IconPlus />
-                <span className="hidden lg:inline">Add Section</span>
+                <span className="hidden lg:inline">Add User</span>
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -451,10 +448,7 @@ export function DataTable({
           </Dialog>
         </div>
       </div>
-      <TabsContent
-        value="outline"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
-      >
+      <div className="relative flex flex-col gap-4 overflow-auto px-4 py-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
           <DndContext
             collisionDetection={closestCenter}
@@ -583,22 +577,7 @@ export function DataTable({
             </div>
           </div>
         </div>
-      </TabsContent>
-      <TabsContent
-        value="past-performance"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent
-        value="focus-documents"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
   )
 }

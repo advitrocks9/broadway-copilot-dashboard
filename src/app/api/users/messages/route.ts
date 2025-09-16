@@ -2,6 +2,7 @@ import { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 
+/** Fetches messages for a user */
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return new Response(null, { status: 401 })

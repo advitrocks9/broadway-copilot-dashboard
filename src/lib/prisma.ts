@@ -2,10 +2,12 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaClient as PrismaClientEdge } from "@prisma/client/edge";
 import { withAccelerate } from '@prisma/extension-accelerate'
 
+/** Creates singleton Prisma client instance */
 const prismaClientSingleton = () => {
   return new PrismaClient().$extends(withAccelerate())
 }
 
+/** Creates singleton Prisma Edge client instance */
 const prismaEdgeClientSingleton = () => {
     return new PrismaClientEdge().$extends(withAccelerate())
 }

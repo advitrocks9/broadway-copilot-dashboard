@@ -8,6 +8,7 @@ import {
 import { AppSidebar } from "@/components/global/app-sidebar"
 import { SiteHeader } from "@/components/global/site-header"
 
+/** Dashboard layout component */
 export default async function DashboardLayout({
   children,
 }: {

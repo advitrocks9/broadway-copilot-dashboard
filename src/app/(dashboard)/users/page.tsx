@@ -3,11 +3,21 @@
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { DataTable } from "@/components/users/user-table"
-import { revalidatePath } from "next/cache"
-import { redirect } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
 
-async function listWhitelistedUsers() {
+type UserRow = {
+  id: string
+  waId: string
+  createdAt: Date | null
+  profileName?: string | null
+  lastActive: Date | null
+  messages: number
+  tokens: number
+  cost: number
+}
+
+/** Lists whitelisted users with activity data */
+async function listWhitelistedUsers(): Promise<UserRow[]> {
   const whitelist = await prisma.userWhitelist.findMany()
   const users = await prisma.user.findMany({
     where: { whatsappId: { in: whitelist.map(w => w.waId) } },
@@ -34,9 +44,11 @@ async function listWhitelistedUsers() {
   `
 
   const lastMap = new Map(lastActive.map(r => [r.userId, r.ts]))
-  const totalMap = new Map(totals.map(r => [r.userId, { messages: r.messages, tokens: r.tokens, cost: r.cost }]))
+  const totalMap = new Map(
+    totals.map(r => [r.userId, { messages: r.messages, tokens: r.tokens, cost: r.cost }])
+  )
 
-  const userRows = users.map(u => ({
+  const userRows: UserRow[] = users.map(u => ({
     id: u.id,
     waId: u.whatsappId,
     createdAt: u.createdAt,
@@ -48,13 +60,13 @@ async function listWhitelistedUsers() {
   }))
 
   const userWaIds = new Set(users.map(u => u.whatsappId))
-  const missing = whitelist
+  const missing: UserRow[] = whitelist
     .filter(w => !userWaIds.has(w.waId))
     .map(w => ({
       id: `whitelist:${w.id}`,
       waId: w.waId,
-      createdAt: null as unknown as Date,
-      lastActive: null as Date | null,
+      createdAt: null,
+      lastActive: null,
       messages: 0,
       tokens: 0,
       cost: 0,
@@ -65,45 +77,13 @@ async function listWhitelistedUsers() {
 
 // Messages fetched on client via /api/users/messages
 
-async function addToWhitelist(formData: FormData) {
-  "use server"
-  const waId = String(formData.get("waId") || "").trim()
-  if (!waId) return
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/users/whitelist`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ waId }),
-  })
-  if (res.ok) {
-    revalidatePath("/users")
-    redirect("/users?status=whitelist_added")
-  }
-  if (res.status === 409) {
-    revalidatePath("/users")
-    redirect("/users?status=whitelist_exists")
-  }
-  const data = await res.json().catch(() => ({} as any)) as { error?: string }
-  redirect(`/users?status=whitelist_add_failed&reason=${encodeURIComponent(data?.error || "")}`)
-}
-
-async function removeFromWhitelist(waId: string) {
-  "use server"
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/users/whitelist?waId=${encodeURIComponent(waId)}`, { method: "DELETE" })
-  if (res.status === 204) {
-    revalidatePath("/users")
-    redirect("/users?status=whitelist_removed")
-  }
-  const data = await res.json().catch(() => ({} as any)) as { error?: string }
-  revalidatePath("/users")
-  redirect(`/users?status=whitelist_remove_failed&reason=${encodeURIComponent(data?.error || "")}`)
-}
-
+/** Renders users page */
 export default async function UsersPage() {
   const rows = await listWhitelistedUsers()
   const tableData = rows.map((u, idx) => ({
     id: idx + 1,
     phoneNumber: u.waId,
-    name: ("profileName" in u && typeof (u as any).profileName === "string" ? (u as any).profileName : ""),
+    name: u.profileName ?? "",
     lastActive: u.lastActive ? `${formatDistanceToNow(new Date(u.lastActive))} ago` : "—",
     totalMessages: String(u.messages ?? 0),
     totalTokens: String(u.tokens ?? 0),

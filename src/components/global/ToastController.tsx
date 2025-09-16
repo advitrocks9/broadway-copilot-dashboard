@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
+/** Shows toast notifications based on status/error */
 function showToastForStatus(status: string | null, error: string | null, reason: string | null) {
   if (status) {
     switch (status) {
@@ -53,6 +54,7 @@ function showToastForStatus(status: string | null, error: string | null, reason:
   }
 }
 
+/** Handles toast notifications from URL params */
 export default function ToastController() {
   const router = useRouter()
   const pathname = usePathname()

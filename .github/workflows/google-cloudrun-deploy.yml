@@ -1,0 +1,70 @@
+name: 'Build and Deploy to Cloud Run'
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+env:
+  PROJECT_ID: 'broadway-chatbot'
+  REGION: 'asia-south2'
+  SERVICE: 'broadway-chatbot-dashboard'
+  WORKLOAD_IDENTITY_PROVIDER: 'projects/480746037141/locations/global/workloadIdentityPools/github-actions-cloud-run/providers/github'
+  SERVICE_ACCOUNT: 'github-actions-deploy@broadway-chatbot.iam.gserviceaccount.com'
+
+jobs:
+  deploy:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: '${{ env.WORKLOAD_IDENTITY_PROVIDER }}'
+          service_account: '${{ env.SERVICE_ACCOUNT }}'
+
+      - name: 'Configure Docker for Artifact Registry'
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+
+      - name: 'Build and Push Container'
+        run: |
+          DOCKER_TAG="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/broadway-chatbot/${{ env.SERVICE }}:${{ github.sha }}"
+          docker build --tag "${DOCKER_TAG}" .
+          docker push "${DOCKER_TAG}"
+
+      - id: deploy
+        name: 'Deploy to Cloud Run'
+        uses: 'google-github-actions/deploy-cloudrun@v2'
+        with:
+          project_id: '${{ env.PROJECT_ID }}'
+          service: '${{ env.SERVICE }}'
+          region: '${{ env.REGION }}'
+          image: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/broadway-chatbot/${{ env.SERVICE }}:${{ github.sha }}'
+          env_vars: |-
+            NODE_ENV=production
+          secrets: |-
+            GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest
+            GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest
+            GMAIL_USER=GMAIL_USER:latest
+            GMAIL_PASS=GMAIL_PASS:latest
+            AUTH_SECRET=AUTH_SECRET:latest
+            DATABASE_URL=_ACCELERAT_DATABASEE_URL:latest
+          flags: >-
+            --execution-environment=gen2
+            --service-account=github-actions-deploy@broadway-chatbot.iam.gserviceaccount.com
+            --cpu=2
+            --memory=4Gi
+            --min-instances=1
+            --no-invoker-iam-check
+            --concurrency=8
+
+      - name: 'Show output'
+        run: |
+          echo ${{ steps.deploy.outputs.url }}

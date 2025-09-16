@@ -1,6 +1,7 @@
-import { signIn, signOut } from "@/lib/auth"
+import { signIn } from "@/lib/auth"
 import { LoginForm } from "@/components/global/login-form"
 
+/** Renders login page */
 export default function LoginPage() {
   return (
     <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
@@ -8,19 +9,7 @@ export default function LoginPage() {
         <LoginForm
           onGoogle={async () => {
             "use server"
-            const result = await signIn("google", { redirectTo: "/?status=signed_in" })
-            return result
-          }}
-          onMagicLink={async (formData: FormData) => {
-            "use server"
-            const email = formData.get("email") as string
-            const result = await signIn("nodemailer", formData, { redirectTo: "/login?status=magic_sent" })
-            return result
-          }}
-          onSignOut={async () => {
-            "use server"
-            const result = await signOut({ redirectTo: "/login?status=signed_out" })
-            return result
+            await signIn("google", { redirectTo: "/?status=signed_in" })
           }}
         />
       </div>

@@ -4,13 +4,36 @@ import { MessagesErrorsBarChart } from "@/components/dashboard/BarChart"
 import { ModelCostPieChart } from "@/components/dashboard/PieChart"
 import { UsersLineChart } from "@/components/dashboard/LineChart"
 
+type TopMetrics = {
+  messages: number
+  errors: number
+  activeUsers: number
+  costUsd: number
+}
 
+type TimeSeriesDataPoint = {
+  time: string
+  value: number
+}
+
+type TimeSeries = {
+  messages: TimeSeriesDataPoint[]
+  errors: TimeSeriesDataPoint[]
+}
+
+type ModelCost = {
+  model: string
+  cost: number
+}
+
+/** Returns start and end dates for last week */
 function getLastWeek(): { start: Date; end: Date } {
   const now = new Date()
   const start = new Date(now.getTime() - 7 * 86400000)
   return { start, end: now }
 }
 
+/** Formats date into bucket label string */
 function formatBucketLabel(d: Date, includeTime: boolean) {
   const yyyy = d.getFullYear()
   const mm = (d.getMonth() + 1).toString().padStart(2, "0")
@@ -21,6 +44,7 @@ function formatBucketLabel(d: Date, includeTime: boolean) {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`
 }
 
+/** Enumerates time buckets between start and end dates */
 function enumerateBuckets(start: Date, end: Date, stepMs: number) {
   const points: { key: string; date: Date }[] = []
   const alignedStart = new Date(Math.floor(start.getTime() / stepMs) * stepMs)
@@ -32,10 +56,8 @@ function enumerateBuckets(start: Date, end: Date, stepMs: number) {
   return points
 }
 
-/**
- * Returns top-level metrics for the dashboard within a time range.
- */
-async function getTopMetrics(start: Date) {
+/** Returns top-level dashboard metrics */
+async function getTopMetrics(start: Date): Promise<TopMetrics> {
   const [messages24h, errors24h, activeUsers, cost24h] = await Promise.all([
     prisma.message.count({ where: { createdAt: { gte: start } } }),
     prisma.graphRun.count({ where: { startTime: { gte: start }, status: "ERROR" } }),
@@ -66,10 +88,12 @@ async function getTopMetrics(start: Date) {
   }
 }
 
-/**
- * Returns time-series for messages and error runs, zero-filled, using a custom bucket in hours.
- */
-async function getTimeSeries(start: Date, end: Date, bucketHours: number) {
+/** Returns time-series data for messages and errors */
+async function getTimeSeries(
+  start: Date,
+  end: Date,
+  bucketHours: number
+): Promise<TimeSeries> {
   const bucketSeconds = bucketHours * 3600
 
   const [msgRows, errRows] = await Promise.all([
@@ -101,10 +125,12 @@ async function getTimeSeries(start: Date, end: Date, bucketHours: number) {
   return { messages, errors }
 }
 
-/**
- * Returns unique active users per bucket, zero-filled, using a custom bucket in hours.
- */
-async function getUsersSeries(start: Date, end: Date, bucketHours: number) {
+/** Returns unique active users per time bucket */
+async function getUsersSeries(
+  start: Date,
+  end: Date,
+  bucketHours: number
+): Promise<TimeSeriesDataPoint[]> {
   const bucketSeconds = bucketHours * 3600
 
   const rows = await prisma.$queryRaw<{ ts: Date; value: number }[]>`
@@ -133,10 +159,8 @@ async function getUsersSeries(start: Date, end: Date, bucketHours: number) {
   return users
 }
 
-/**
- * Returns cost breakdown by model for the period.
- */
-async function getCostByModel(start: Date) {
+/** Returns cost breakdown by model */
+async function getCostByModel(start: Date): Promise<ModelCost[]> {
   const rows = await prisma.$queryRaw<{ model: string; cost: number }[]>`
     SELECT lt.model AS model, COALESCE(SUM(CAST(lt."costUsd" AS DOUBLE PRECISION)), 0)::float AS cost
     FROM "LLMTrace" lt
@@ -148,6 +172,7 @@ async function getCostByModel(start: Date) {
   return rows
 }
 
+/** Renders dashboard home page */
 export default async function HomePage() {
   const { start, end } = getLastWeek()
 
