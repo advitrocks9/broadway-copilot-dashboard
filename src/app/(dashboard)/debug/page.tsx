@@ -20,7 +20,7 @@ async function listRuns() {
   const runs = await prisma.graphRun.findMany({
     where,
     orderBy: { startTime: "desc" },
-    include: { user: true, llmTraces: true },
+    include: { user: true, nodeRuns: { include: { llmTraces: true } } },
     take: 50,
   })
   return runs
@@ -30,7 +30,8 @@ export default async function DebugPage() {
   const runs = await listRuns()
 
   const tableData = runs.map(run => {
-    const totalTokens = run.llmTraces.reduce(
+    const allLlmTraces = run.nodeRuns.flatMap(nr => nr.llmTraces)
+    const totalTokens = allLlmTraces.reduce(
       (acc, trace) => acc + (trace.totalTokens ?? 0),
       0
     )
@@ -41,7 +42,7 @@ export default async function DebugPage() {
     const initialState = run.initialState as InitialState
     const userMessage = initialState?.input?.Body || "N/A"
 
-    const lastTrace = run.llmTraces.at(-1)
+    const lastTrace = allLlmTraces.at(-1)
     const outputMessage = lastTrace?.outputMessage as OutputMessage | undefined
     const assistantReply =
       outputMessage && typeof outputMessage.content === "string"

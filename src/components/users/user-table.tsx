@@ -50,7 +50,6 @@ import {
 import { toast } from "sonner"
 import { z } from "zod"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
 import { Checkbox } from "@/components/ui/checkbox"
@@ -92,9 +91,11 @@ import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 export const schema = z.object({
-  id: z.number(),
+  id: z.string(),
   phoneNumber: z.string(),
   name: z.string(),
+  gender: z.string(),
+  ageGroup: z.string(),
   lastActive: z.string(),
   totalMessages: z.string(),
   totalTokens: z.string(),
@@ -102,7 +103,7 @@ export const schema = z.object({
 
 // Create a separate component for the drag handle
 /** Renders drag handle for sortable items */
-function DragHandle({ id }: { id: number }) {
+function DragHandle({ id }: { id: string }) {
   const { attributes, listeners } = useSortable({
     id,
   })
@@ -165,36 +166,54 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "name",
     header: "Name",
     cell: ({ row }) => (
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
+        <div className="flex">
           {row.original.name}
-        </Badge>
+        </div>
+    ),
+  },
+  {
+    accessorKey: "gender",
+    header: "Gender",
+    cell: ({ row }) => (
+      <div className="flex pl-2">
+        {row.original.gender}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "ageGroup",
+    header: "Age Group",
+    cell: ({ row }) => (
+      <div className="flex pl-4">
+        {row.original.ageGroup}
+      </div>
     ),
   },
   {
     accessorKey: "lastActive",
     header: "Last Active",
     cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
+      <div className="flex">
         {row.original.lastActive}
-      </Badge>
+      </div>
     ),
   },
   {
     accessorKey: "totalMessages",
     header: () => "Total Messages",
     cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
+      <div className="flex">
         {row.original.totalMessages}
-      </Badge>
+      </div>
     ),
   },
   {
     accessorKey: "totalTokens",
     header: () => "Total Tokens",
     cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
+      <div className="flex">
         {row.original.totalTokens}
-      </Badge>
+      </div>
     ),
   },
   {

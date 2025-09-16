@@ -28,7 +28,6 @@ import {
   IconChevronsRight,
   IconCircleCheckFilled,
   IconCircleXFilled,
-  IconDotsVertical,
   IconGripVertical,
   IconLayoutColumns,
   IconLoader,
@@ -58,7 +57,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
@@ -77,7 +75,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { useRouter } from "next/navigation"
+import {
+  GraphRunDetail,
+  GraphRunPayload,
+  GraphRunDetailSkeleton,
+} from "@/components/debug/graph-run-detail"
 
 export const schema = z.object({
   graphRunId: z.string(),
@@ -179,30 +189,15 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "timeTaken",
     header: "Time Taken",
   },
-  {
-    id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon"
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>View Details</DropdownMenuItem>
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-  },
 ]
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+function DraggableRow({
+  row,
+  onRowClick,
+}: {
+  row: Row<z.infer<typeof schema>>
+  onRowClick: (row: z.infer<typeof schema> | null) => void
+}) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.graphRunId,
   })
@@ -212,11 +207,12 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
       data-state={row.getIsSelected() && "selected"}
       data-dragging={isDragging}
       ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
+      className="relative z-0 cursor-pointer data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
       style={{
         transform: CSS.Transform.toString(transform),
         transition: transition,
       }}
+      onClick={() => onRowClick(row.original)}
     >
       {row.getVisibleCells().map((cell) => (
         <TableCell key={cell.id}>
@@ -234,6 +230,13 @@ export function DataTable({
 }) {
   const router = useRouter()
   const [data, setData] = React.useState(() => initialData)
+  const [selectedRow, setSelectedRow] = React.useState<z.infer<
+    typeof schema
+  > | null>(null)
+  const [detailData, setDetailData] = React.useState<GraphRunPayload | null>(
+    null
+  )
+  const [isLoadingDetail, setIsLoadingDetail] = React.useState(false)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
@@ -281,6 +284,23 @@ export function DataTable({
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
+
+  React.useEffect(() => {
+    if (selectedRow) {
+      setIsLoadingDetail(true)
+      fetch(`/api/debug/graph-run/${selectedRow.graphRunId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          setDetailData(data)
+        })
+        .catch(console.error)
+        .finally(() => {
+          setIsLoadingDetail(false)
+        })
+    } else {
+      setDetailData(null)
+    }
+  }, [selectedRow])
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -376,7 +396,11 @@ export function DataTable({
                     strategy={verticalListSortingStrategy}
                   >
                     {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} />
+                      <DraggableRow
+                        key={row.id}
+                        row={row}
+                        onRowClick={setSelectedRow}
+                      />
                     ))}
                   </SortableContext>
                 ) : (
@@ -471,6 +495,29 @@ export function DataTable({
           </div>
         </div>
       </div>
+      <Sheet
+        open={!!selectedRow}
+        onOpenChange={(open) => !open && setSelectedRow(null)}
+      >
+        <SheetContent className="min-w-[900px] p-0">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Trace Details</SheetTitle>
+            <SheetDescription>
+              Detailed view of a trace, including node runs and LLM traces.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="h-full">
+            {isLoadingDetail ? (
+              <GraphRunDetailSkeleton />
+            ) : (
+              <GraphRunDetail
+                graphRun={detailData}
+                onClose={() => setSelectedRow(null)}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

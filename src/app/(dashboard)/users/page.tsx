@@ -1,7 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
+import { Prisma, Gender, AgeGroup } from "@prisma/client"
 import { DataTable } from "@/components/users/user-table"
 import { formatDistanceToNow } from "date-fns"
 
@@ -10,6 +10,10 @@ type UserRow = {
   waId: string
   createdAt: Date | null
   profileName?: string | null
+  inferredGender?: Gender | null
+  inferredAgeGroup?: AgeGroup | null
+  confirmedGender?: Gender | null
+  confirmedAgeGroup?: AgeGroup | null
   lastActive: Date | null
   messages: number
   tokens: number
@@ -20,11 +24,22 @@ type UserRow = {
 async function listWhitelistedUsers(): Promise<UserRow[]> {
   const whitelist = await prisma.userWhitelist.findMany()
   const users = await prisma.user.findMany({
-    where: { whatsappId: { in: whitelist.map(w => w.waId) } },
-    select: { id: true, whatsappId: true, createdAt: true, profileName: true },
+    where: { whatsappId: { in: whitelist.map((w) => w.waId) } },
+    select: {
+      id: true,
+      whatsappId: true,
+      createdAt: true,
+      profileName: true,
+      inferredGender: true,
+      inferredAgeGroup: true,
+      confirmedGender: true,
+      confirmedAgeGroup: true,
+    },
   })
 
-  const lastActive = await prisma.$queryRaw<{ userId: string; ts: Date }[]>`
+  const lastActive = await prisma.$queryRaw<
+    { userId: string; ts: Date }[]
+  >`
     SELECT gr."userId", MAX(gr."startTime") AS ts
     FROM "GraphRun" gr
     GROUP BY gr."userId"
@@ -38,31 +53,39 @@ async function listWhitelistedUsers(): Promise<UserRow[]> {
     FROM "Conversation" c
     LEFT JOIN "Message" m ON m."conversationId" = c.id
     LEFT JOIN "GraphRun" gr ON gr."conversationId" = c.id
-    LEFT JOIN "LLMTrace" lt ON lt."graphRunId" = gr.id
+    LEFT JOIN "NodeRun" nr ON nr."graphRunId" = gr.id
+    LEFT JOIN "LLMTrace" lt ON lt."nodeRunId" = nr.id
     WHERE c."userId" IN (${Prisma.join(userIds)})
     GROUP BY c."userId"
   `
 
   const lastMap = new Map(lastActive.map(r => [r.userId, r.ts]))
   const totalMap = new Map(
-    totals.map(r => [r.userId, { messages: r.messages, tokens: r.tokens, cost: r.cost }])
+    totals.map((r) => [
+      r.userId,
+      { messages: r.messages, tokens: r.tokens, cost: r.cost },
+    ])
   )
 
-  const userRows: UserRow[] = users.map(u => ({
+  const userRows: UserRow[] = users.map((u) => ({
     id: u.id,
     waId: u.whatsappId,
     createdAt: u.createdAt,
     profileName: u.profileName,
+    inferredGender: u.inferredGender,
+    inferredAgeGroup: u.inferredAgeGroup,
+    confirmedGender: u.confirmedGender,
+    confirmedAgeGroup: u.confirmedAgeGroup,
     lastActive: lastMap.get(u.id) ?? null,
     messages: totalMap.get(u.id)?.messages ?? 0,
     tokens: totalMap.get(u.id)?.tokens ?? 0,
     cost: totalMap.get(u.id)?.cost ?? 0,
   }))
 
-  const userWaIds = new Set(users.map(u => u.whatsappId))
+  const userWaIds = new Set(users.map((u) => u.whatsappId))
   const missing: UserRow[] = whitelist
-    .filter(w => !userWaIds.has(w.waId))
-    .map(w => ({
+    .filter((w) => !userWaIds.has(w.waId))
+    .map((w) => ({
       id: `whitelist:${w.id}`,
       waId: w.waId,
       createdAt: null,
@@ -77,17 +100,42 @@ async function listWhitelistedUsers(): Promise<UserRow[]> {
 
 // Messages fetched on client via /api/users/messages
 
+function formatGender(gender: Gender | null | undefined): string {
+  if (!gender) return "—"
+  switch (gender) {
+    case "MALE":
+      return "Male"
+    case "FEMALE":
+      return "Female"
+    default:
+      return "—"
+  }
+}
+
+function formatAgeGroup(ageGroup: AgeGroup | null | undefined): string {
+  if (!ageGroup) return "—"
+  return ageGroup.replace("AGE_", "").replace("_PLUS", "+").replace("_", "-")
+}
+
 /** Renders users page */
 export default async function UsersPage() {
   const rows = await listWhitelistedUsers()
-  const tableData = rows.map((u, idx) => ({
-    id: idx + 1,
-    phoneNumber: u.waId,
-    name: u.profileName ?? "",
-    lastActive: u.lastActive ? `${formatDistanceToNow(new Date(u.lastActive))} ago` : "—",
-    totalMessages: String(u.messages ?? 0),
-    totalTokens: String(u.tokens ?? 0),
-  }))
+  const tableData = rows.map((u) => {
+    const gender = u.confirmedGender || u.inferredGender
+    const ageGroup = u.confirmedAgeGroup || u.inferredAgeGroup
+    return {
+      id: u.id,
+      phoneNumber: u.waId,
+      name: u.profileName ?? "",
+      gender: formatGender(gender),
+      ageGroup: formatAgeGroup(ageGroup),
+      lastActive: u.lastActive
+        ? `${formatDistanceToNow(new Date(u.lastActive))} ago`
+        : "—",
+      totalMessages: String(u.messages ?? 0),
+      totalTokens: String(u.tokens ?? 0),
+    }
+  })
   return (
     <div className="flex flex-col gap-4 ">
       <div className="flex items-center justify-between px-4 py-[22px] lg:px-6 lg:py-[24px]">
