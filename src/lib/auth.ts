@@ -12,7 +12,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/login", // ToastController reads error param
     verifyRequest: "/login",
   },
-  trustHost: true,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,

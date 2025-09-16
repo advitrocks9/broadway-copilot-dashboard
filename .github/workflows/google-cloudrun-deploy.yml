@@ -56,7 +56,8 @@ jobs:
           image: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/broadway-chatbot/${{ env.SERVICE }}:${{ github.sha }}'
           env_vars: |-
             NODE_ENV=production
-            NEXTAUTH_URL=https://broadway-chatbot-dashboard-480746037141.asia-south2.run.app
+            AUTH_URL=https://broadway-chatbot-dashboard-480746037141.asia-south2.run.app
+            AUTH_TRUST_HOST=true
           secrets: |-
             GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest
             GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest
