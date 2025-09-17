@@ -45,13 +45,21 @@ async function listWhitelistedUsers(): Promise<UserRow[]> {
     GROUP BY gr."userId"
   `
   const userIds = users.map(u => u.id)
-  const totals = userIds.length === 0 ? [] : await prisma.$queryRaw<{ userId: string; messages: number; tokens: number; cost: number }[]>`
+  
+  const messageCounts = userIds.length === 0 ? [] : await prisma.$queryRaw<{ userId: string; messages: number }[]>`
     SELECT c."userId",
-      COUNT(m.*)::int as messages,
+      COUNT(m.id)::int as messages
+    FROM "Conversation" c
+    LEFT JOIN "Message" m ON m."conversationId" = c.id
+    WHERE c."userId" IN (${Prisma.join(userIds)})
+    GROUP BY c."userId"
+  `
+  
+  const tokenCosts = userIds.length === 0 ? [] : await prisma.$queryRaw<{ userId: string; tokens: number; cost: number }[]>`
+    SELECT c."userId",
       COALESCE(SUM(lt."totalTokens"),0)::int as tokens,
       COALESCE(SUM(lt."costUsd"),0)::float as cost
     FROM "Conversation" c
-    LEFT JOIN "Message" m ON m."conversationId" = c.id
     LEFT JOIN "GraphRun" gr ON gr."conversationId" = c.id
     LEFT JOIN "NodeRun" nr ON nr."graphRunId" = gr.id
     LEFT JOIN "LLMTrace" lt ON lt."nodeRunId" = nr.id
@@ -60,12 +68,8 @@ async function listWhitelistedUsers(): Promise<UserRow[]> {
   `
 
   const lastMap = new Map(lastActive.map(r => [r.userId, r.ts]))
-  const totalMap = new Map(
-    totals.map((r) => [
-      r.userId,
-      { messages: r.messages, tokens: r.tokens, cost: r.cost },
-    ])
-  )
+  const messageMap = new Map(messageCounts.map(r => [r.userId, r.messages]))
+  const tokenCostMap = new Map(tokenCosts.map(r => [r.userId, { tokens: r.tokens, cost: r.cost }]))
 
   const userRows: UserRow[] = users.map((u) => ({
     id: u.id,
@@ -77,9 +81,9 @@ async function listWhitelistedUsers(): Promise<UserRow[]> {
     confirmedGender: u.confirmedGender,
     confirmedAgeGroup: u.confirmedAgeGroup,
     lastActive: lastMap.get(u.id) ?? null,
-    messages: totalMap.get(u.id)?.messages ?? 0,
-    tokens: totalMap.get(u.id)?.tokens ?? 0,
-    cost: totalMap.get(u.id)?.cost ?? 0,
+    messages: messageMap.get(u.id) ?? 0,
+    tokens: tokenCostMap.get(u.id)?.tokens ?? 0,
+    cost: tokenCostMap.get(u.id)?.cost ?? 0,
   }))
 
   const userWaIds = new Set(users.map((u) => u.whatsappId))

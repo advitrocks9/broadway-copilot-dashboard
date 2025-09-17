@@ -8,9 +8,6 @@ interface InitialState {
   }
 }
 
-interface OutputMessage {
-  content?: string
-}
 
 async function listRuns() {
   const now = new Date()
@@ -24,6 +21,14 @@ async function listRuns() {
     take: 50,
   })
   return runs
+}
+
+interface FinalState {
+  assistantReply?: Array<{
+    reply_type: string
+    reply_text?: string
+    media_url?: string
+  }> | null
 }
 
 export default async function DebugPage() {
@@ -42,12 +47,19 @@ export default async function DebugPage() {
     const initialState = run.initialState as InitialState
     const userMessage = initialState?.input?.Body || "N/A"
 
-    const lastTrace = allLlmTraces.at(-1)
-    const outputMessage = lastTrace?.outputMessage as OutputMessage | undefined
-    const assistantReply =
-      outputMessage && typeof outputMessage.content === "string"
-        ? outputMessage.content
-        : "N/A"
+    const finalState = run.finalState as FinalState | undefined
+    let assistantReply = "N/A"
+
+    if (finalState?.assistantReply && Array.isArray(finalState.assistantReply)) {
+      const textReplies = finalState.assistantReply
+        .filter(reply => reply.reply_type === "text" && reply.reply_text)
+        .map(reply => reply.reply_text)
+        .join(" ")
+      
+      if (textReplies.trim()) {
+        assistantReply = textReplies.trim()
+      }
+    }
 
     return {
       graphRunId: run.id,

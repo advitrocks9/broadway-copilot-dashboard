@@ -4,6 +4,7 @@ import * as React from "react"
 import { Prisma } from "@prisma/client"
 import {
   Activity,
+  AlertTriangle,
   Bot,
   ChevronRight,
   Clock,
@@ -54,9 +55,19 @@ type LLMTrace = GraphRunPayload["nodeRuns"][0]["llmTraces"][0] & {
   tags?: string[]
 }
 type NodeRun = GraphRunPayload["nodeRuns"][0]
+type ErrorTrace = {
+  id: string
+  type: 'error'
+  errorTrace: string
+  graphRunId: string
+}
 
-function isLLMTrace(item: NodeRun | LLMTrace): item is LLMTrace {
+function isLLMTrace(item: NodeRun | LLMTrace | ErrorTrace): item is LLMTrace {
   return "model" in item
+}
+
+function isErrorTrace(item: NodeRun | LLMTrace | ErrorTrace): item is ErrorTrace {
+  return "type" in item && item.type === 'error'
 }
 
 function LLMTraceDetail({ trace }: { trace: LLMTrace }) {
@@ -129,6 +140,46 @@ function LLMTraceDetail({ trace }: { trace: LLMTrace }) {
   )
 }
 
+function ErrorTraceDetail({ error }: { error: ErrorTrace }) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b">
+        <div className="flex items-center gap-2 mb-2">
+          <AlertTriangle className="h-5 w-5 text-red-500" />
+          <h3 className="text-lg text-red-600 font-semibold">Graph run errored</h3>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <div className="p-4 space-y-6">
+          <div>
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm text-muted-foreground">
+                    Stack Trace
+                  </CardTitle>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => navigator.clipboard.writeText(error.errorTrace)}
+                  >
+                    <Clipboard className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <pre className="text-xs font-mono overflow-auto max-h-[600px] text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {error.errorTrace}
+                </pre>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function GraphRunDetailSkeleton() {
   return (
     <div className="flex h-full">
@@ -177,14 +228,25 @@ export function GraphRunDetail({
   onClose: () => void
 }) {
   const [selectedItem, setSelectedItem] = React.useState<
-    NodeRun | LLMTrace | null
+    NodeRun | LLMTrace | ErrorTrace | null
   >(null)
 
   React.useEffect(() => {
-    if (graphRun?.nodeRuns?.length) {
-      const firstLlmTrace = graphRun.nodeRuns.flatMap((nr) => nr.llmTraces)[0]
-      if (firstLlmTrace) {
-        setSelectedItem(firstLlmTrace)
+    if (graphRun) {
+      // If there's an error trace, select it first
+      if (graphRun.status === 'ERROR' && graphRun.errorTrace) {
+        const errorTrace: ErrorTrace = {
+          id: graphRun.id,
+          type: 'error',
+          errorTrace: graphRun.errorTrace || 'No error trace available',
+          graphRunId: graphRun.id
+        }
+        setSelectedItem(errorTrace)
+      } else if (graphRun.nodeRuns?.length) {
+        const firstLlmTrace = graphRun.nodeRuns.flatMap((nr) => nr.llmTraces)[0]
+        if (firstLlmTrace) {
+          setSelectedItem(firstLlmTrace)
+        }
       }
     }
   }, [graphRun])
@@ -226,6 +288,36 @@ export function GraphRunDetail({
         <ScrollArea className="flex-1 p-2">
           <SidebarGroup>
             <SidebarMenu>
+              {/* Error section */}
+              {graphRun.status === 'ERROR' && graphRun.errorTrace && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => {
+                      const errorTrace: ErrorTrace = {
+                        id: graphRun.id,
+                        type: 'error',
+                        errorTrace: graphRun.errorTrace || 'No error trace available',
+                        graphRunId: graphRun.id
+                      }
+                      setSelectedItem(errorTrace)
+                    }}
+                    isActive={
+                      !!(
+                        selectedItem &&
+                        isErrorTrace(selectedItem) &&
+                        selectedItem?.graphRunId === graphRun.id
+                      )
+                    }
+                  >
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    <span className="flex-1 text-left text-red-600 font-semibold">
+                      Error
+                    </span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              
+              {/* Node runs */}
               {graphRun.nodeRuns.map((nodeRun) => (
                 <Collapsible
                   key={nodeRun.id}
@@ -299,13 +391,15 @@ export function GraphRunDetail({
         </div>
         <div className="flex-1 overflow-y-auto">
           {selectedItem ? (
-            isLLMTrace(selectedItem) ? (
+            isErrorTrace(selectedItem) ? (
+              <ErrorTraceDetail error={selectedItem} />
+            ) : isLLMTrace(selectedItem) ? (
               <LLMTraceDetail trace={selectedItem} />
             ) : (
-              <p className="p-4">Select an LLM trace to see details.</p>
+              <p className="p-4">Select an LLM trace or error to see details.</p>
             )
           ) : (
-            <p className="p-4">Select an LLM trace to see details.</p>
+            <p className="p-4">Select an LLM trace or error to see details.</p>
           )}
         </div>
       </div>
