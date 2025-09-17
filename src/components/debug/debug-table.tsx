@@ -61,7 +61,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { useRouter } from "next/navigation"
 import {
   GraphRunDetail,
   GraphRunPayload,
@@ -146,7 +145,6 @@ export function DataTable({
 }: {
   data: z.infer<typeof schema>[]
 }) {
-  const router = useRouter()
   const [selectedRow, setSelectedRow] = React.useState<z.infer<
     typeof schema
   > | null>(null)

@@ -2,8 +2,10 @@
 
 import * as React from "react"
 import { Prisma } from "@prisma/client"
+import ReactMarkdown from "react-markdown"
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism"
 import {
-  Activity,
   AlertTriangle,
   Bot,
   ChevronRight,
@@ -12,6 +14,8 @@ import {
   Link as LinkIcon,
   X,
   Zap,
+  Eye,
+  Code,
 } from "lucide-react"
 
 import {
@@ -22,7 +26,6 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import "react18-json-view/src/style.css"
 import { Button } from "../ui/button"
 import { Separator } from "../ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -62,6 +65,42 @@ type ErrorTrace = {
   graphRunId: string
 }
 
+type ToolCall = {
+  id: string
+  type: string
+  function?: {
+    name: string
+    arguments: string
+  }
+}
+
+type ParsedLLMResponse = {
+  model: string
+  usage: Record<string, unknown>
+  toolCalls: ToolCall[]
+  content: string | null
+  finishReason: string | null
+}
+
+type RawLLMResponse = {
+  model?: string
+  usage?: Record<string, unknown>
+  choices?: Array<{
+    message?: {
+      content?: string
+      tool_calls?: Array<{
+        id: string
+        type: string
+        function?: {
+          name: string
+          arguments: string
+        }
+      }>
+    }
+    finish_reason?: string
+  }>
+}
+
 function isLLMTrace(item: NodeRun | LLMTrace | ErrorTrace): item is LLMTrace {
   return "model" in item
 }
@@ -70,10 +109,61 @@ function isErrorTrace(item: NodeRun | LLMTrace | ErrorTrace): item is ErrorTrace
   return "type" in item && item.type === 'error'
 }
 
+function copyToClipboard(text: string) {
+  navigator.clipboard.writeText(text)
+}
+
+function parseJsonResponse(rawResponse: unknown): ParsedLLMResponse | null {
+  try {
+    let response: RawLLMResponse
+    if (typeof rawResponse === 'string') {
+      response = JSON.parse(rawResponse) as RawLLMResponse
+    } else {
+      response = rawResponse as RawLLMResponse
+    }
+    
+    const parsed: ParsedLLMResponse = {
+      model: response.model || 'Unknown',
+      usage: response.usage || {},
+      toolCalls: [],
+      content: null,
+      finishReason: null
+    }
+    
+    // Extract tool calls
+    if (response.choices && response.choices[0]) {
+      const choice = response.choices[0]
+      if (choice.message) {
+        parsed.content = choice.message.content || null
+        parsed.finishReason = choice.finish_reason || null
+        
+        if (choice.message.tool_calls) {
+          parsed.toolCalls = choice.message.tool_calls.map((tc) => ({
+            id: tc.id,
+            type: tc.type,
+            function: tc.function ? {
+              name: tc.function.name,
+              arguments: tc.function.arguments
+            } : undefined
+          }))
+        }
+      }
+    }
+    
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+
 function LLMTraceDetail({ trace }: { trace: LLMTrace }) {
+  const [showRawJson, setShowRawJson] = React.useState(false)
   const inputMessages = trace.inputMessages
     ? (trace.inputMessages as { role: string; content: string | object }[])
     : []
+  
+  const parsedResponse = parseJsonResponse(trace.rawResponse)
 
   return (
     <div className="flex flex-col h-full">
@@ -81,14 +171,6 @@ function LLMTraceDetail({ trace }: { trace: LLMTrace }) {
         <div className="flex items-center gap-2 mb-2">
           <Zap className="h-5 w-5 text-blue-500" />
           <h3 className="text-lg font-semibold">{trace.model}</h3>
-          <Badge variant="outline">{trace.id}</Badge>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => navigator.clipboard.writeText(trace.id)}
-          >
-            <Clipboard className="h-4 w-4" />
-          </Button>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -101,38 +183,195 @@ function LLMTraceDetail({ trace }: { trace: LLMTrace }) {
       <div className="flex-1 overflow-auto">
         <div className="p-4 space-y-6">
           <div>
-            <h4 className="font-semibold mb-3">Messages</h4>
+            <h2 className="font-semibold text-xl mb-4">Messages</h2>
             <div className="space-y-3">
-              {inputMessages.map((msg, index) => (
-                <Card key={index}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm capitalize">
-                      {msg.role}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <pre className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                      {typeof msg.content === "string"
-                        ? msg.content
-                        : JSON.stringify(msg.content, null, 2)}
-                    </pre>
-                  </CardContent>
-                </Card>
-              ))}
+              {inputMessages.map((msg, index) => {
+                const rawContent = typeof msg.content === "string" 
+                  ? msg.content 
+                  : JSON.stringify(msg.content, null, 2)
+                
+                  return (
+                    <Card key={index}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm capitalize">
+                            {msg.role}
+                          </CardTitle>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => copyToClipboard(rawContent)}
+                            className="h-7 w-7 p-0"
+                          >
+                            <Clipboard className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {typeof msg.content === "string" ? (
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown
+                              components={{
+                                code(props) {
+                                  const {children, className, ...rest} = props
+                                  const match = /language-(\w+)/.exec(className || '')
+                                  const isInline = !match
+                                  return !isInline ? (
+                                    <pre className="text-sm font-mono text-foreground p-3 rounded-md overflow-auto">
+                                      <code>{String(children).replace(/\n$/, '')}</code>
+                                    </pre>
+                                  ) : (
+                                    <code className="text-sm font-mono text-muted-foreground px-1 py-0.5 rounded" {...rest}>
+                                      {children}
+                                    </code>
+                                  )
+                                }
+                              }}
+                            >
+                              {msg.content}
+                            </ReactMarkdown>
+                          </div>
+                        ) : (
+                          <pre className="text-sm font-mono text-foreground p-3 rounded overflow-auto">
+                            {JSON.stringify(msg.content, null, 2)}
+                          </pre>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+              })}
             </div>
           </div>
           <Separator />
-          <div className="grid grid-cols-1 gap-6">
-            <div>
-              <h4 className="font-semibold mb-3">Output</h4>
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-xl">Output</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRawJson(!showRawJson)}
+                className="flex items-center gap-2"
+              >
+                {showRawJson ? (
+                  <>
+                    <Eye className="h-3 w-3" />
+                    Show Parsed
+                  </>
+                ) : (
+                  <>
+                    <Code className="h-3 w-3" />
+                    Show Raw JSON
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {showRawJson ? (
               <Card>
-                <CardContent className="p-4">
-                  <pre className="text-xs font-mono overflow-auto max-h-[600px] text-muted-foreground">
-                    {JSON.stringify(trace.rawResponse, null, 2)}
-                  </pre>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm">Raw JSON</CardTitle>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(JSON.stringify(trace.rawResponse, null, 2))}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Clipboard className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-full">
+                    <pre className="text-xs font-mono text-foreground p-4 overflow-auto">
+                      {JSON.stringify(trace.rawResponse, null, 2)}
+                    </pre>
+                  </ScrollArea>
                 </CardContent>
               </Card>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                {parsedResponse?.content && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Content</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown
+                          components={{
+                            code(props) {
+                              const {children, className, ...rest} = props
+                              const match = /language-(\w+)/.exec(className || '')
+                              const isInline = !match
+                              return !isInline ? (
+                                <SyntaxHighlighter
+                                  language={match[1]}
+                                  style={oneDark}
+                                  customStyle={{
+                                    fontSize: '12px',
+                                    margin: '8px 0',
+                                  }}
+                                >
+                                  {String(children).replace(/\n$/, '')}
+                                </SyntaxHighlighter>
+                              ) : (
+                                <code className="text-sm font-mono text-muted-foreground px-1 py-0.5 rounded" {...rest}>
+                                  {children}
+                                </code>
+                              )
+                            }
+                          }}
+                        >
+                          {parsedResponse.content}
+                        </ReactMarkdown>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {parsedResponse?.toolCalls && parsedResponse.toolCalls.length > 0 && (
+                  <>
+                    {parsedResponse.toolCalls.map((toolCall, index: number) => (
+                      <Card key={index}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <CardTitle className="text-sm">Tool Call</CardTitle>
+                              <Badge variant="secondary" className="text-xs">
+                                {toolCall.function?.name || 'Unknown'}
+                              </Badge>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                const args = toolCall.function?.arguments ? JSON.stringify(JSON.parse(toolCall.function.arguments), null, 2) : '{}'
+                                const toolCallString = `Tool Call: ${toolCall.function?.name}\nID: ${toolCall.id}\nArguments:\n${args}`
+                                copyToClipboard(toolCallString)
+                              }}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Clipboard className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="text-xs text-muted-foreground font-mono">
+                            ID: {toolCall.id}
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {toolCall.function?.arguments && (
+                            <pre className="text-xs font-mono text-foreground p-3 rounded overflow-auto">
+                              {JSON.stringify(JSON.parse(toolCall.function.arguments), null, 2)}
+                            </pre>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -145,15 +384,16 @@ function ErrorTraceDetail({ error }: { error: ErrorTrace }) {
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">
         <div className="flex items-center gap-2 mb-2">
-          <AlertTriangle className="h-5 w-5 text-red-500" />
-          <h3 className="text-lg text-red-600 font-semibold">Graph run errored</h3>
+          <AlertTriangle className="h-5 w-5 text-destructive" />
+          <h3 className="text-lg text-destructive font-semibold">Graph run errored</h3>
         </div>
       </div>
       <div className="flex-1 overflow-auto">
         <div className="p-4 space-y-6">
           <div>
+            <h2 className="font-semibold text-xl mb-4">Error Details</h2>
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm text-muted-foreground">
                     Stack Trace
@@ -168,7 +408,7 @@ function ErrorTraceDetail({ error }: { error: ErrorTrace }) {
                 </div>
               </CardHeader>
               <CardContent>
-                <pre className="text-xs font-mono overflow-auto max-h-[600px] text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                <pre className="text-xs font-mono overflow-auto max-h-[600px] text-foreground leading-relaxed whitespace-pre-wrap">
                   {error.errorTrace}
                 </pre>
               </CardContent>
