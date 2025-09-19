@@ -90,98 +90,81 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     accessorKey: "name",
     header: "Name",
-    cell: ({ row }) => (
-        <div className="flex">
-          {row.original.name}
-        </div>
-    ),
+    cell: ({ row }) => <div className="flex">{row.original.name}</div>,
   },
   {
     accessorKey: "gender",
     header: "Gender",
-    cell: ({ row }) => (
-      <div className="flex pl-2">
-        {row.original.gender}
-      </div>
-    ),
+    cell: ({ row }) => <div className="flex pl-2">{row.original.gender}</div>,
   },
   {
     accessorKey: "ageGroup",
     header: "Age Group",
-    cell: ({ row }) => (
-      <div className="flex pl-4">
-        {row.original.ageGroup}
-      </div>
-    ),
+    cell: ({ row }) => <div className="flex pl-4">{row.original.ageGroup}</div>,
   },
   {
     accessorKey: "lastActive",
     header: "Last Active",
-    cell: ({ row }) => (
-      <div className="flex">
-        {row.original.lastActive}
-      </div>
-    ),
+    cell: ({ row }) => <div className="flex">{row.original.lastActive}</div>,
   },
   {
     accessorKey: "totalMessages",
     header: () => "Total Messages",
-    cell: ({ row }) => (
-      <div className="flex">
-        {row.original.totalMessages}
-      </div>
-    ),
+    cell: ({ row }) => <div className="flex">{row.original.totalMessages}</div>,
   },
   {
     accessorKey: "totalTokens",
     header: () => "Total Tokens",
-    cell: ({ row }) => (
-      <div className="flex">
-        {row.original.totalTokens}
-      </div>
-    ),
+    cell: ({ row }) => <div className="flex">{row.original.totalTokens}</div>,
   },
   {
     id: "actions",
-    cell: ({ row }) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon"
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={async () => {
-              try {
-                const res = await fetch(`/api/users/whitelist?waId=${encodeURIComponent(row.original.phoneNumber)}`, { method: "DELETE" })
-                if (res.status === 204) {
-                  toast.success("User removed")
-                  location.reload()
-                } else {
-                  const j = (await res.json().catch(() => ({}))) as { error?: string }
-                  toast.error(j?.error || "Failed to remove")
-                }
-              } catch {
-                toast.error("Failed to remove")
-              }
-            }}
-          >
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
+    cell: ({ row }) => <ActionCell row={row} />,
   },
 ]
 
-/** Renders table row */
+function ActionCell({ row }: { row: Row<z.infer<typeof schema>> }) {
+  const router = useRouter()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+          size="icon"
+        >
+          <IconDotsVertical />
+          <span className="sr-only">Open menu</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-32">
+        <DropdownMenuItem
+          variant="destructive"
+          onSelect={async () => {
+            try {
+              const res = await fetch(
+                `/api/users/whitelist?waId=${encodeURIComponent(row.original.phoneNumber)}`,
+                { method: "DELETE" },
+              )
+              if (res.status === 204) {
+                toast.success("User removed")
+                router.refresh()
+              } else {
+                const j = (await res.json().catch(() => ({}))) as { error?: string }
+                toast.error(j?.error || "Failed to remove")
+              }
+            } catch {
+              toast.error("Failed to remove")
+            }
+          }}
+        >
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function UserRow({ row }: { row: Row<z.infer<typeof schema>> }) {
   return (
     <TableRow className="hover:bg-muted/50">
@@ -194,19 +177,11 @@ function UserRow({ row }: { row: Row<z.infer<typeof schema>> }) {
   )
 }
 
-/** Data table with sorting, filtering, and pagination */
-export function DataTable({
-  data: initialData,
-}: {
-  data: z.infer<typeof schema>[]
-}) {
+export function DataTable({ data: initialData }: { data: z.infer<typeof schema>[] }) {
   const router = useRouter()
 
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
@@ -238,7 +213,6 @@ export function DataTable({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
 
-  /** Adds new user to whitelist */
   async function handleAddUser() {
     const value = (waValue || "").trim()
     const isValid = /^\+91\d{10}$/.test(value)
@@ -277,7 +251,7 @@ export function DataTable({
         </Label>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          <Button variant="outline" size="sm" onClick={() => router.refresh()}>
             <IconRefresh className="size-4" />
             <span className="sr-only">Refresh</span>
           </Button>
@@ -293,20 +267,14 @@ export function DataTable({
             <DropdownMenuContent align="end" className="w-56">
               {table
                 .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
+                .filter((column) => typeof column.accessorFn !== "undefined" && column.getCanHide())
                 .map((column) => {
                   return (
                     <DropdownMenuCheckboxItem
                       key={column.id}
                       className="capitalize"
                       checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
                     >
                       {column.id}
                     </DropdownMenuCheckboxItem>
@@ -355,13 +323,14 @@ export function DataTable({
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
                     return (
-                      <TableHead key={header.id} colSpan={header.colSpan} className={header.index === 0 ? "pl-4" : ""}>
+                      <TableHead
+                        key={header.id}
+                        colSpan={header.colSpan}
+                        className={header.index === 0 ? "pl-4" : ""}
+                      >
                         {header.isPlaceholder
                           ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
+                          : flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     )
                   })}
@@ -377,10 +346,7 @@ export function DataTable({
                 </>
               ) : (
                 <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
+                  <TableCell colSpan={columns.length} className="h-24 text-center">
                     No results.
                   </TableCell>
                 </TableRow>
@@ -404,9 +370,7 @@ export function DataTable({
                 }}
               >
                 <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                  <SelectValue
-                    placeholder={table.getState().pagination.pageSize}
-                  />
+                  <SelectValue placeholder={table.getState().pagination.pageSize} />
                 </SelectTrigger>
                 <SelectContent side="top">
                   {[10, 20, 30, 40, 50].map((pageSize) => (
@@ -418,8 +382,7 @@ export function DataTable({
               </Select>
             </div>
             <div className="flex w-fit items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
+              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
             </div>
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
               <Button

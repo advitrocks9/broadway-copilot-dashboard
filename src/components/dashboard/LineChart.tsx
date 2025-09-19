@@ -2,13 +2,7 @@
 
 import { CartesianGrid, Line, LineChart, XAxis } from "recharts"
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   ChartConfig,
   ChartContainer,
@@ -16,11 +10,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 
-export function UsersLineChart({
-  data,
-}: {
-  data: { time: string; value: number }[]
-}) {
+export function UsersLineChart({ data }: { data: { time: string; value: number }[] }) {
   const chartConfig = {
     users: {
       label: "Users",
@@ -38,9 +28,23 @@ export function UsersLineChart({
         <ChartContainer config={chartConfig}>
           <LineChart accessibilityLayer data={data} margin={{ left: 12, right: 12 }}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} minTickGap={32} />
+            <XAxis
+              dataKey="time"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              minTickGap={32}
+            />
             <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-            <Line dataKey="value" name="users" type="natural" stroke="var(--color-users)" strokeWidth={2} dot={{ fill: "var(--color-users)" }} activeDot={{ r: 5 }} />
+            <Line
+              dataKey="value"
+              name="users"
+              type="natural"
+              stroke="var(--color-users)"
+              strokeWidth={2}
+              dot={{ fill: "var(--color-users)" }}
+              activeDot={{ r: 5 }}
+            />
           </LineChart>
         </ChartContainer>
       </CardContent>

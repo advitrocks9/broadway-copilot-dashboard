@@ -1,16 +1,9 @@
 "use client"
 
-import {
-  IconDotsVertical,
-  IconLogout,
-} from "@tabler/icons-react"
+import { IconDotsVertical, IconLogout } from "@tabler/icons-react"
 import { signOut } from "next-auth/react"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +19,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
-/** Renders user navigation component */
 export function NavUser({
   user,
 }: {
@@ -53,9 +45,7 @@ export function NavUser({
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
-                <span className="text-muted-foreground truncate text-xs">
-                  {user.email}
-                </span>
+                <span className="text-muted-foreground truncate text-xs">{user.email}</span>
               </div>
               <IconDotsVertical className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -74,9 +64,7 @@ export function NavUser({
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
-                  <span className="text-muted-foreground truncate text-xs">
-                    {user.email}
-                  </span>
+                  <span className="text-muted-foreground truncate text-xs">{user.email}</span>
                 </div>
               </div>
             </DropdownMenuLabel>

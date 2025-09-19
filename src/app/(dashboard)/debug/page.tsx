@@ -8,7 +8,6 @@ interface InitialState {
   }
 }
 
-
 async function listRuns() {
   const now = new Date()
   const start = new Date(now.getTime() - 7 * 86400000)
@@ -34,15 +33,10 @@ interface FinalState {
 export default async function DebugPage() {
   const runs = await listRuns()
 
-  const tableData = runs.map(run => {
-    const allLlmTraces = run.nodeRuns.flatMap(nr => nr.llmTraces)
-    const totalTokens = allLlmTraces.reduce(
-      (acc, trace) => acc + (trace.totalTokens ?? 0),
-      0
-    )
-    const timeTaken = run.endTime
-      ? (run.endTime.getTime() - run.startTime.getTime()) / 1000
-      : 0
+  const tableData = runs.map((run) => {
+    const allLlmTraces = run.nodeRuns.flatMap((nr) => nr.llmTraces)
+    const totalTokens = allLlmTraces.reduce((acc, trace) => acc + (trace.totalTokens ?? 0), 0)
+    const timeTaken = run.endTime ? (run.endTime.getTime() - run.startTime.getTime()) / 1000 : 0
 
     const initialState = run.initialState as InitialState
     const userMessage = initialState?.input?.Body || "N/A"
@@ -52,10 +46,10 @@ export default async function DebugPage() {
 
     if (finalState?.assistantReply && Array.isArray(finalState.assistantReply)) {
       const textReplies = finalState.assistantReply
-        .filter(reply => reply.reply_type === "text" && reply.reply_text)
-        .map(reply => reply.reply_text)
+        .filter((reply) => reply.reply_type === "text" && reply.reply_text)
+        .map((reply) => reply.reply_text)
         .join(" ")
-      
+
       if (textReplies.trim()) {
         assistantReply = textReplies.trim()
       }
@@ -74,8 +68,8 @@ export default async function DebugPage() {
   })
 
   return (
-    <div className="flex flex-col gap-4 ">
-      <div className="flex items-center justify-between px-4 py-[22px] lg:px-6 lg:py-[24px]">
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between px-4 py-6 lg:px-6">
         <h1 className="text-4xl font-semibold">Debug</h1>
       </div>
       <DataTable data={tableData} />

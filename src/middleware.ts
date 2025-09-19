@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth-edge"
 
-/** Handles authentication and redirection */
 export default auth((req) => {
   const pathname = req.nextUrl.pathname
   const isAuthed = !!req.auth

@@ -1,14 +1,8 @@
 import type { PrismaClient } from "@prisma/client"
-import type {
-  Adapter,
-  AdapterAccount,
-  AdapterSession,
-  AdapterUser,
-} from "@auth/core/adapters"
+import type { Adapter, AdapterAccount, AdapterSession, AdapterUser } from "@auth/core/adapters"
 
-/** Custom Prisma adapter for NextAuth.js */
 export function PrismaAdapter(
-  prisma: PrismaClient | ReturnType<PrismaClient["$extends"]>
+  prisma: PrismaClient | ReturnType<PrismaClient["$extends"]>,
 ): Adapter {
   const p = prisma as PrismaClient
   return {
@@ -27,10 +21,8 @@ export function PrismaAdapter(
         where: { id },
         ...stripUndefined(data),
       }) as Promise<AdapterUser>,
-    deleteUser: (id) =>
-      p.admins.delete({ where: { id } }) as Promise<AdapterUser>,
-    linkAccount: (data) =>
-      p.adminAccount.create({ data }) as unknown as AdapterAccount,
+    deleteUser: (id) => p.admins.delete({ where: { id } }) as Promise<AdapterUser>,
+    linkAccount: (data) => p.adminAccount.create({ data }) as unknown as AdapterAccount,
     unlinkAccount: async ({ provider, providerAccountId }) => {
       await p.adminAccount.deleteMany({ where: { provider, providerAccountId } })
       return { provider, providerAccountId } as unknown as AdapterAccount
@@ -50,14 +42,10 @@ export function PrismaAdapter(
         where: { sessionToken: data.sessionToken },
         ...stripUndefined(data),
       }),
-    deleteSession: (sessionToken) =>
-      p.adminSession.delete({ where: { sessionToken } }),
+    deleteSession: (sessionToken) => p.adminSession.delete({ where: { sessionToken } }),
     async createVerificationToken(data) {
-      const verificationToken = await p.adminVerificationToken.create(
-        stripUndefined(data)
-      )
-      if ("id" in verificationToken && verificationToken.id)
-        delete verificationToken.id
+      const verificationToken = await p.adminVerificationToken.create(stripUndefined(data))
+      if ("id" in verificationToken && verificationToken.id) delete verificationToken.id
       return verificationToken
     },
     async useVerificationToken(identifier_token) {
@@ -65,17 +53,11 @@ export function PrismaAdapter(
         const verificationToken = await p.adminVerificationToken.delete({
           where: { identifier_token },
         })
-        if ("id" in verificationToken && verificationToken.id)
-          delete verificationToken.id
+        if ("id" in verificationToken && verificationToken.id) delete verificationToken.id
         return verificationToken
       } catch (error: unknown) {
         // If token already used/deleted, just return null
-        if (
-          error &&
-          typeof error === "object" &&
-          "code" in error &&
-          error.code === "P2025"
-        )
+        if (error && typeof error === "object" && "code" in error && error.code === "P2025")
           return null
         throw error
       }
@@ -107,7 +89,6 @@ export function PrismaAdapter(
   }
 }
 
-/** Removes undefined properties from object */
 function stripUndefined<T>(obj: T) {
   const data = {} as T
   for (const key in obj) if (obj[key] !== undefined) data[key] = obj[key]

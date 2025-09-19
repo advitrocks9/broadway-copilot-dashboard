@@ -3,13 +3,7 @@
 import * as React from "react"
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   ChartConfig,
   ChartContainer,
@@ -34,7 +28,7 @@ export function MessagesErrorsBarChart({
         acc.errors += cur.errors
         return acc
       },
-      { messages: 0, errors: 0 }
+      { messages: 0, errors: 0 },
     )
   }, [data])
 
@@ -57,9 +51,7 @@ export function MessagesErrorsBarChart({
                 className="data-[active=true]:bg-muted/50 relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left even:border-l sm:border-t-0 sm:border-l sm:px-8 sm:py-6"
                 onClick={() => setActiveSeries(series)}
               >
-                <span className="text-muted-foreground text-xs">
-                  {chartConfig[series].label}
-                </span>
+                <span className="text-muted-foreground text-xs">{chartConfig[series].label}</span>
                 <span className="text-lg leading-none font-bold sm:text-3xl">
                   {totals[series].toLocaleString()}
                 </span>
@@ -72,7 +64,13 @@ export function MessagesErrorsBarChart({
         <ChartContainer config={chartConfig} className="aspect-auto h-[300px] w-full">
           <BarChart accessibilityLayer data={data} margin={{ left: 12, right: 12 }}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} minTickGap={32} />
+            <XAxis
+              dataKey="time"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              minTickGap={32}
+            />
             <ChartTooltip content={<ChartTooltipContent />} />
             <Bar dataKey={activeSeries} fill={`var(--color-${activeSeries})`} />
           </BarChart>

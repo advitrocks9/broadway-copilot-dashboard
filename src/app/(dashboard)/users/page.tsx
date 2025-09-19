@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { Prisma, Gender, AgeGroup } from "@prisma/client"
 import { DataTable } from "@/components/users/user-table"
 import { formatDistanceToNow } from "date-fns"
+import { formatGender, formatAgeGroup } from "@/lib/format-utils"
 
 type UserRow = {
   id: string
@@ -20,7 +21,6 @@ type UserRow = {
   cost: number
 }
 
-/** Lists whitelisted users with activity data */
 async function listWhitelistedUsers(): Promise<UserRow[]> {
   const whitelist = await prisma.userWhitelist.findMany()
   const users = await prisma.user.findMany({
@@ -37,16 +37,17 @@ async function listWhitelistedUsers(): Promise<UserRow[]> {
     },
   })
 
-  const lastActive = await prisma.$queryRaw<
-    { userId: string; ts: Date }[]
-  >`
+  const lastActive = await prisma.$queryRaw<{ userId: string; ts: Date }[]>`
     SELECT gr."userId", MAX(gr."startTime") AS ts
     FROM "GraphRun" gr
     GROUP BY gr."userId"
   `
-  const userIds = users.map(u => u.id)
-  
-  const messageCounts = userIds.length === 0 ? [] : await prisma.$queryRaw<{ userId: string; messages: number }[]>`
+  const userIds = users.map((u) => u.id)
+
+  const messageCounts =
+    userIds.length === 0
+      ? []
+      : await prisma.$queryRaw<{ userId: string; messages: number }[]>`
     SELECT c."userId",
       COUNT(m.id)::int as messages
     FROM "Conversation" c
@@ -54,8 +55,11 @@ async function listWhitelistedUsers(): Promise<UserRow[]> {
     WHERE c."userId" IN (${Prisma.join(userIds)})
     GROUP BY c."userId"
   `
-  
-  const tokenCosts = userIds.length === 0 ? [] : await prisma.$queryRaw<{ userId: string; tokens: number; cost: number }[]>`
+
+  const tokenCosts =
+    userIds.length === 0
+      ? []
+      : await prisma.$queryRaw<{ userId: string; tokens: number; cost: number }[]>`
     SELECT c."userId",
       COALESCE(SUM(lt."totalTokens"),0)::int as tokens,
       COALESCE(SUM(lt."costUsd"),0)::float as cost
@@ -67,9 +71,11 @@ async function listWhitelistedUsers(): Promise<UserRow[]> {
     GROUP BY c."userId"
   `
 
-  const lastMap = new Map(lastActive.map(r => [r.userId, r.ts]))
-  const messageMap = new Map(messageCounts.map(r => [r.userId, r.messages]))
-  const tokenCostMap = new Map(tokenCosts.map(r => [r.userId, { tokens: r.tokens, cost: r.cost }]))
+  const lastMap = new Map(lastActive.map((r) => [r.userId, r.ts]))
+  const messageMap = new Map(messageCounts.map((r) => [r.userId, r.messages]))
+  const tokenCostMap = new Map(
+    tokenCosts.map((r) => [r.userId, { tokens: r.tokens, cost: r.cost }]),
+  )
 
   const userRows: UserRow[] = users.map((u) => ({
     id: u.id,
@@ -102,26 +108,6 @@ async function listWhitelistedUsers(): Promise<UserRow[]> {
   return [...userRows, ...missing]
 }
 
-// Messages fetched on client via /api/users/messages
-
-function formatGender(gender: Gender | null | undefined): string {
-  if (!gender) return "—"
-  switch (gender) {
-    case "MALE":
-      return "Male"
-    case "FEMALE":
-      return "Female"
-    default:
-      return "—"
-  }
-}
-
-function formatAgeGroup(ageGroup: AgeGroup | null | undefined): string {
-  if (!ageGroup) return "—"
-  return ageGroup.replace("AGE_", "").replace("_PLUS", "+").replace("_", "-")
-}
-
-/** Renders users page */
 export default async function UsersPage() {
   const rows = await listWhitelistedUsers()
   const tableData = rows.map((u) => {
@@ -133,18 +119,15 @@ export default async function UsersPage() {
       name: u.profileName ?? "",
       gender: formatGender(gender),
       ageGroup: formatAgeGroup(ageGroup),
-      lastActive: u.lastActive
-        ? `${formatDistanceToNow(new Date(u.lastActive))} ago`
-        : "—",
+      lastActive: u.lastActive ? `${formatDistanceToNow(new Date(u.lastActive))} ago` : "—",
       totalMessages: String(u.messages ?? 0),
       totalTokens: String(u.tokens ?? 0),
     }
   })
   return (
-    <div className="flex flex-col gap-4 ">
-      <div className="flex items-center justify-between px-4 py-[22px] lg:px-6 lg:py-[24px]">
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between px-4 py-6 lg:px-6">
         <h1 className="text-4xl font-semibold">Users</h1>
-        
       </div>
 
       <DataTable data={tableData} />

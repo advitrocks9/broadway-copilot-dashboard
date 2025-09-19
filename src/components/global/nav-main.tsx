@@ -30,7 +30,11 @@ export function NavMain({
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
               asChild
             >
-              <a href="http://wa.me/+14155238886?text=join%20wave-swung" target="_blank" rel="noopener noreferrer">
+              <a
+                href="http://wa.me/+14155238886?text=join%20wave-swung"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <IconCirclePlusFilled />
                 <span>Quick Chat</span>
               </a>
@@ -41,7 +45,11 @@ export function NavMain({
               variant="outline"
               asChild
             >
-              <a href="http://wa.me/+14155238886?text=join%20wave-swung" target="_blank" rel="noopener noreferrer">
+              <a
+                href="http://wa.me/+14155238886?text=join%20wave-swung"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <IconMessageCircle />
                 <span className="sr-only">Chat</span>
               </a>

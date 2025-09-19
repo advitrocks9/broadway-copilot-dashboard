@@ -3,15 +3,12 @@ import { prisma } from "@/lib/prisma"
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ graphRunId: string }> }
+  { params }: { params: Promise<{ graphRunId: string }> },
 ) {
   const { graphRunId } = await params
 
   if (!graphRunId) {
-    return NextResponse.json(
-      { error: "graphRunId is required" },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "graphRunId is required" }, { status: 400 })
   }
 
   try {
@@ -38,9 +35,6 @@ export async function GET(
     return NextResponse.json(graphRun)
   } catch (error) {
     console.error("Failed to fetch graph run:", error)
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }

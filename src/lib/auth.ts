@@ -23,15 +23,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         host: "smtp.gmail.com",
         port: 465,
         auth: {
-             user: process.env.GMAIL_USER,
-             pass: process.env.GMAIL_PASS,
+          user: process.env.GMAIL_USER,
+          pass: process.env.GMAIL_PASS,
         },
       },
       from: process.env.GMAIL_USER,
     }),
   ],
   callbacks: {
-    /** Handles user sign-in by checking whitelist */
     async signIn({ user }) {
       if (!user?.email) {
         return false
@@ -49,15 +48,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return false
       }
     },
-    /** Adds user ID to session object */
     async session({ session, user }) {
       if (session.user && user) {
-        ;(session.user as typeof session.user & { id: string }).id = user.id
+        session.user.id = user.id
         session.user.email = user.email ?? session.user.email
       }
       return session
     },
-    /** Handles authentication flow redirects */
     async redirect({ url, baseUrl }) {
       try {
         const target = new URL(url, baseUrl)
@@ -73,7 +70,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
         if (pathname.startsWith("/api/auth/error")) {
           const err = target.searchParams.get("error")
-          const redirectUrl = err ? `${baseUrl}/login?error=${encodeURIComponent(err)}` : `${baseUrl}/login`
+          const redirectUrl = err
+            ? `${baseUrl}/login?error=${encodeURIComponent(err)}`
+            : `${baseUrl}/login`
           return redirectUrl
         }
         if (url.startsWith("/")) {
@@ -83,8 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (target.origin === baseUrl) {
           return target.toString()
         }
-      } catch {
-      }
+      } catch {}
       return baseUrl
     },
   },

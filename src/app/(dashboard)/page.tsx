@@ -1,62 +1,11 @@
 import { prisma } from "@/lib/prisma"
+import { getLastWeek, formatBucketLabel, enumerateBuckets } from "@/lib/dashboard-utils"
 import { SectionCards } from "@/components/dashboard/section-cards"
 import { MessagesErrorsBarChart } from "@/components/dashboard/BarChart"
 import { ModelCostPieChart } from "@/components/dashboard/PieChart"
 import { UsersLineChart } from "@/components/dashboard/LineChart"
+import type { TopMetrics, TimeSeriesDataPoint, TimeSeries, ModelCost } from "@/types"
 
-type TopMetrics = {
-  messages: number
-  errors: number
-  activeUsers: number
-  costUsd: number
-}
-
-type TimeSeriesDataPoint = {
-  time: string
-  value: number
-}
-
-type TimeSeries = {
-  messages: TimeSeriesDataPoint[]
-  errors: TimeSeriesDataPoint[]
-}
-
-type ModelCost = {
-  model: string
-  cost: number
-}
-
-/** Returns start and end dates for last week */
-function getLastWeek(): { start: Date; end: Date } {
-  const now = new Date()
-  const start = new Date(now.getTime() - 7 * 86400000)
-  return { start, end: now }
-}
-
-/** Formats date into bucket label string */
-function formatBucketLabel(d: Date, includeTime: boolean) {
-  const yyyy = d.getFullYear()
-  const mm = (d.getMonth() + 1).toString().padStart(2, "0")
-  const dd = d.getDate().toString().padStart(2, "0")
-  if (!includeTime) return `${yyyy}-${mm}-${dd}`
-  const hh = d.getHours().toString().padStart(2, "0")
-  const min = d.getMinutes().toString().padStart(2, "0")
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
-}
-
-/** Enumerates time buckets between start and end dates */
-function enumerateBuckets(start: Date, end: Date, stepMs: number) {
-  const points: { key: string; date: Date }[] = []
-  const alignedStart = new Date(Math.floor(start.getTime() / stepMs) * stepMs)
-  const cursor = new Date(alignedStart)
-  while (cursor <= end) {
-    points.push({ key: formatBucketLabel(cursor, true), date: new Date(cursor) })
-    cursor.setTime(cursor.getTime() + stepMs)
-  }
-  return points
-}
-
-/** Returns top-level dashboard metrics */
 async function getTopMetrics(start: Date): Promise<TopMetrics> {
   const [messages24h, errors24h, activeUsers, cost24h] = await Promise.all([
     prisma.message.count({ where: { createdAt: { gte: start } } }),
@@ -88,12 +37,7 @@ async function getTopMetrics(start: Date): Promise<TopMetrics> {
   }
 }
 
-/** Returns time-series data for messages and errors */
-async function getTimeSeries(
-  start: Date,
-  end: Date,
-  bucketHours: number
-): Promise<TimeSeries> {
+async function getTimeSeries(start: Date, end: Date, bucketHours: number): Promise<TimeSeries> {
   const bucketSeconds = bucketHours * 3600
 
   const [msgRows, errRows] = await Promise.all([
@@ -117,19 +61,18 @@ async function getTimeSeries(
 
   const stepMs = bucketSeconds * 1000
   const buckets = enumerateBuckets(start, end, stepMs)
-  const msgMap = new Map(msgRows.map(r => [formatBucketLabel(r.ts, true), r.value]))
-  const errMap = new Map(errRows.map(r => [formatBucketLabel(r.ts, true), r.value]))
+  const msgMap = new Map(msgRows.map((r) => [formatBucketLabel(r.ts, true), r.value]))
+  const errMap = new Map(errRows.map((r) => [formatBucketLabel(r.ts, true), r.value]))
 
-  const messages = buckets.map(b => ({ time: b.key, value: msgMap.get(b.key) ?? 0 }))
-  const errors = buckets.map(b => ({ time: b.key, value: errMap.get(b.key) ?? 0 }))
+  const messages = buckets.map((b) => ({ time: b.key, value: msgMap.get(b.key) ?? 0 }))
+  const errors = buckets.map((b) => ({ time: b.key, value: errMap.get(b.key) ?? 0 }))
   return { messages, errors }
 }
 
-/** Returns unique active users per time bucket */
 async function getUsersSeries(
   start: Date,
   end: Date,
-  bucketHours: number
+  bucketHours: number,
 ): Promise<TimeSeriesDataPoint[]> {
   const bucketSeconds = bucketHours * 3600
 
@@ -154,12 +97,11 @@ async function getUsersSeries(
 
   const stepMs = bucketSeconds * 1000
   const buckets = enumerateBuckets(start, end, stepMs)
-  const valueMap = new Map(rows.map(r => [formatBucketLabel(r.ts, true), r.value]))
-  const users = buckets.map(b => ({ time: b.key, value: valueMap.get(b.key) ?? 0 }))
+  const valueMap = new Map(rows.map((r) => [formatBucketLabel(r.ts, true), r.value]))
+  const users = buckets.map((b) => ({ time: b.key, value: valueMap.get(b.key) ?? 0 }))
   return users
 }
 
-/** Returns cost breakdown by model */
 async function getCostByModel(start: Date): Promise<ModelCost[]> {
   const rows = await prisma.$queryRaw<{ model: string; cost: number }[]>`
     SELECT lt.model AS model, COALESCE(SUM(CAST(lt."costUsd" AS DOUBLE PRECISION)), 0)::float AS cost
@@ -172,7 +114,6 @@ async function getCostByModel(start: Date): Promise<ModelCost[]> {
   return rows
 }
 
-/** Renders dashboard home page */
 export default async function HomePage() {
   const { start, end } = getLastWeek()
 
@@ -191,11 +132,16 @@ export default async function HomePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between px-4 py-[22px] lg:px-6 lg:py-[24px] ">
+      <div className="flex items-center justify-between px-4 py-6 lg:px-6">
         <h1 className="text-4xl font-semibold">Overview</h1>
       </div>
 
-      <SectionCards activeUsers={top.activeUsers} messages={top.messages} errors={top.errors} costUsd={top.costUsd} />
+      <SectionCards
+        activeUsers={top.activeUsers}
+        messages={top.messages}
+        errors={top.errors}
+        costUsd={top.costUsd}
+      />
 
       <div className="px-4 lg:px-6">
         <MessagesErrorsBarChart data={barData} />
@@ -208,4 +154,3 @@ export default async function HomePage() {
     </div>
   )
 }
-

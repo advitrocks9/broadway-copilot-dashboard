@@ -28,6 +28,8 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 import { z } from "zod"
 
 import { Badge } from "@/components/ui/badge"
@@ -82,7 +84,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     accessorKey: "userphoneNumber",
     header: "Phone Number",
-    cell: ({ row }) => <div className="pl-4">{row.original.userphoneNumber}</div>
+    cell: ({ row }) => <div className="pl-4">{row.original.userphoneNumber}</div>,
   },
   {
     accessorKey: "status",
@@ -92,18 +94,22 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       let icon = <IconLoader className="animate-spin" />
       if (status === "completed") icon = <IconCircleCheckFilled className="text-green-500" />
       if (status === "error") icon = <IconCircleXFilled className="text-red-500" />
-      return <Badge variant="outline" className="text-muted-foreground px-1.5">{icon} {status}</Badge>
-    }
+      return (
+        <Badge variant="outline" className="text-muted-foreground px-1.5">
+          {icon} {status}
+        </Badge>
+      )
+    },
   },
   {
     accessorKey: "userMessage",
     header: "User Message",
-    cell: ({ row }) => <div className="truncate max-w-xs">{row.original.userMessage}</div>
+    cell: ({ row }) => <div className="max-w-xs truncate">{row.original.userMessage}</div>,
   },
   {
     accessorKey: "assistantReply",
     header: "Assistant Reply",
-    cell: ({ row }) => <div className="truncate max-w-xs">{row.original.assistantReply}</div>
+    cell: ({ row }) => <div className="max-w-xs truncate">{row.original.assistantReply}</div>,
   },
   {
     accessorKey: "totalTokens",
@@ -127,10 +133,7 @@ function ClickableRow({
   onRowClick: (row: z.infer<typeof schema> | null) => void
 }) {
   return (
-    <TableRow
-      className="cursor-pointer hover:bg-muted/50"
-      onClick={() => onRowClick(row.original)}
-    >
+    <TableRow className="hover:bg-muted/50 cursor-pointer" onClick={() => onRowClick(row.original)}>
       {row.getVisibleCells().map((cell) => (
         <TableCell key={cell.id}>
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -140,23 +143,13 @@ function ClickableRow({
   )
 }
 
-export function DataTable({
-  data: initialData,
-}: {
-  data: z.infer<typeof schema>[]
-}) {
-  const [selectedRow, setSelectedRow] = React.useState<z.infer<
-    typeof schema
-  > | null>(null)
-  const [detailData, setDetailData] = React.useState<GraphRunPayload | null>(
-    null
-  )
+export function DataTable({ data: initialData }: { data: z.infer<typeof schema>[] }) {
+  const router = useRouter()
+  const [selectedRow, setSelectedRow] = React.useState<z.infer<typeof schema> | null>(null)
+  const [detailData, setDetailData] = React.useState<GraphRunPayload | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = React.useState(false)
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
@@ -193,7 +186,9 @@ export function DataTable({
         .then((data) => {
           setDetailData(data)
         })
-        .catch(console.error)
+        .catch(() => {
+          toast.error("Failed to load trace details")
+        })
         .finally(() => {
           setIsLoadingDetail(false)
         })
@@ -208,9 +203,9 @@ export function DataTable({
         <Label htmlFor="view-selector" className="sr-only">
           View
         </Label>
-        
+
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          <Button variant="outline" size="sm" onClick={() => router.refresh()}>
             <IconRefresh className="size-4" />
             <span className="sr-only">Refresh</span>
           </Button>
@@ -226,20 +221,14 @@ export function DataTable({
             <DropdownMenuContent align="end" className="w-56">
               {table
                 .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
+                .filter((column) => typeof column.accessorFn !== "undefined" && column.getCanHide())
                 .map((column) => {
                   return (
                     <DropdownMenuCheckboxItem
                       key={column.id}
                       className="capitalize"
                       checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
                     >
                       {column.id}
                     </DropdownMenuCheckboxItem>
@@ -247,7 +236,6 @@ export function DataTable({
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          
         </div>
       </div>
       <div className="relative flex flex-col gap-4 px-4 py-4 lg:px-6">
@@ -258,13 +246,14 @@ export function DataTable({
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
                     return (
-                      <TableHead key={header.id} colSpan={header.colSpan} className={header.index === 0 ? "pl-4" : ""}>
+                      <TableHead
+                        key={header.id}
+                        colSpan={header.colSpan}
+                        className={header.index === 0 ? "pl-4" : ""}
+                      >
                         {header.isPlaceholder
                           ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
+                          : flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     )
                   })}
@@ -275,19 +264,12 @@ export function DataTable({
               {table.getRowModel().rows?.length ? (
                 <>
                   {table.getRowModel().rows.map((row) => (
-                    <ClickableRow
-                      key={row.id}
-                      row={row}
-                      onRowClick={setSelectedRow}
-                    />
+                    <ClickableRow key={row.id} row={row} onRowClick={setSelectedRow} />
                   ))}
                 </>
               ) : (
                 <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
+                  <TableCell colSpan={columns.length} className="h-24 text-center">
                     No results.
                   </TableCell>
                 </TableRow>
@@ -311,9 +293,7 @@ export function DataTable({
                 }}
               >
                 <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                  <SelectValue
-                    placeholder={table.getState().pagination.pageSize}
-                  />
+                  <SelectValue placeholder={table.getState().pagination.pageSize} />
                 </SelectTrigger>
                 <SelectContent side="top">
                   {[10, 20, 30, 40, 50].map((pageSize) => (
@@ -325,8 +305,7 @@ export function DataTable({
               </Select>
             </div>
             <div className="flex w-fit items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
+              Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
             </div>
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
               <Button
@@ -372,10 +351,7 @@ export function DataTable({
           </div>
         </div>
       </div>
-      <Sheet
-        open={!!selectedRow}
-        onOpenChange={(open) => !open && setSelectedRow(null)}
-      >
+      <Sheet open={!!selectedRow} onOpenChange={(open) => !open && setSelectedRow(null)}>
         <SheetContent className="min-w-[900px] p-0">
           <SheetHeader className="sr-only">
             <SheetTitle>Trace Details</SheetTitle>
@@ -387,10 +363,7 @@ export function DataTable({
             {isLoadingDetail ? (
               <GraphRunDetailSkeleton />
             ) : (
-              <GraphRunDetail
-                graphRun={detailData}
-                onClose={() => setSelectedRow(null)}
-              />
+              <GraphRunDetail graphRun={detailData} onClose={() => setSelectedRow(null)} />
             )}
           </div>
         </SheetContent>

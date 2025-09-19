@@ -10,5 +10,3 @@ export const { auth } = NextAuth({
   providers: [],
   logger: undefined,
 })
-
-
