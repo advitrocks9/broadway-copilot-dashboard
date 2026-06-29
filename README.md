@@ -1,6 +1,6 @@
 # Broadway Copilot Dashboard
 
-Internal ops dashboard for [Broadway Copilot](https://github.com/advitrocks9/broadway_copilot), a WhatsApp AI stylist. Gives the team visibility into costs, user activity, and agent behaviour across the system.
+Internal ops dashboard for [Broadway Copilot](https://github.com/advitrocks9/broadway-copilot), a WhatsApp AI stylist. Gives the team visibility into costs, user activity, and agent behaviour across the system.
 
 ## What it does
 
@@ -20,8 +20,8 @@ Internal ops dashboard for [Broadway Copilot](https://github.com/advitrocks9/bro
 ## Setup
 
 ```bash
-git clone https://github.com/advitrocks9/broadway_copilot_dashboard.git
-cd broadway_copilot_dashboard
+git clone https://github.com/advitrocks9/broadway-copilot-dashboard.git
+cd broadway-copilot-dashboard
 npm install
 ```
 
